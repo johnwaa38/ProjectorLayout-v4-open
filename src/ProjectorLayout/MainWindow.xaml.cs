@@ -1,35 +1,16 @@
-using System.Windows;
-using ProjectorLayout.ViewModels;
-
 namespace ProjectorLayout;
 
 /// <summary>
-/// Main operator window that hosts editor controls and high-level commands.
+/// Main application window for ProjectorLayout.
+/// Phase 1 intentionally contains only scaffold UI regions and no feature logic.
 /// </summary>
-public partial class MainWindow : Window
+public partial class MainWindow : System.Windows.Window
 {
-    private readonly MainViewModel _viewModel;
-
+    /// <summary>
+    /// Initializes the main window and loads the scaffold layout.
+    /// </summary>
     public MainWindow()
     {
         InitializeComponent();
-        _viewModel = new MainViewModel();
-        DataContext = _viewModel;
     }
-
-    private void OnNewProjectClick(object sender, RoutedEventArgs e) => _viewModel.NewProject();
-
-    private void OnOpenProjectClick(object sender, RoutedEventArgs e) => _viewModel.OpenProject();
-
-    private void OnSaveProjectClick(object sender, RoutedEventArgs e) => _viewModel.SaveProject();
-
-    private void OnLoadImageClick(object sender, RoutedEventArgs e) => _viewModel.LoadBackgroundImage();
-
-    private void OnLoadDxfClick(object sender, RoutedEventArgs e) => _viewModel.LoadDxf();
-
-    private void OnStartProjectionClick(object sender, RoutedEventArgs e) => _viewModel.StartProjection();
-
-    private void OnResetCalibrationClick(object sender, RoutedEventArgs e) => _viewModel.ResetCalibration();
-
-    private void OnExitClick(object sender, RoutedEventArgs e) => Close();
 }

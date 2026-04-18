@@ -8,118 +8,76 @@
         Height="800"
         Width="1200"
         MinHeight="600"
-        MinWidth="900">
-    <DockPanel>
-        <!-- Main menu containing core operator actions for project and asset workflows. -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_File">
-                <MenuItem Header="_New" Click="OnNewProjectClick" />
-                <MenuItem Header="_Open" Click="OnOpenProjectClick" />
-                <MenuItem Header="_Save" Click="OnSaveProjectClick" />
-                <Separator />
-                <MenuItem Header="E_xit" Click="OnExitClick" />
-            </MenuItem>
-            <MenuItem Header="_Assets">
-                <MenuItem Header="Load _Background Image" Click="OnLoadImageClick" />
-                <MenuItem Header="Load _DXF" Click="OnLoadDxfClick" />
-            </MenuItem>
-            <MenuItem Header="_Projection">
-                <MenuItem Header="Start Projection" Click="OnStartProjectionClick" />
-            </MenuItem>
-        </Menu>
+        MinWidth="900"
+        WindowStartupLocation="CenterScreen">
+    <!--
+      Phase 1 scaffold layout:
+      - Left panel: control panel placeholder
+      - Right panel: editor surface with image area + overlay canvas placeholders
+      This is intentionally non-functional in this phase to ensure a clean launch baseline.
+    -->
+    <Grid Background="#1E1E1E">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <!-- Left column is reserved for explicit manual controls and status readouts. -->
-                <ColumnDefinition Width="320" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <!-- Control panel placeholder region. -->
+        <Border Grid.Column="0"
+                Margin="12"
+                Padding="12"
+                Background="#2C2C2C"
+                BorderBrush="#4A4A4A"
+                BorderThickness="1"
+                CornerRadius="6">
+            <StackPanel>
+                <TextBlock Text="Control Panel"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="White" />
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="#CCCCCC"
+                           TextWrapping="Wrap"
+                           Text="Phase 1 scaffold: controls will be added in later phases." />
+            </StackPanel>
+        </Border>
 
-            <ScrollViewer Grid.Column="0"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="12">
-                    <TextBlock FontSize="18"
-                               FontWeight="Bold"
-                               Text="Projector Controls" />
+        <!-- Editor placeholder contains both image and overlay placeholders. -->
+        <Border Grid.Column="1"
+                Margin="12"
+                Padding="0"
+                Background="#111111"
+                BorderBrush="#4A4A4A"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid>
+                <!-- Image area placeholder layer. -->
+                <Border Margin="16"
+                        Background="#202020"
+                        BorderBrush="#3A3A3A"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="#BFBFBF"
+                               FontSize="16"
+                               Text="Image Area (Phase 2)" />
+                </Border>
 
-                    <GroupBox Header="Manual Transform"
-                              Margin="0,12,0,0">
-                        <StackPanel Margin="8">
-                            <TextBlock Text="Translate X" />
-                            <TextBox Text="{Binding OverlayTransform.TranslateX, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <TextBlock Margin="0,8,0,0" Text="Translate Y" />
-                            <TextBox Text="{Binding OverlayTransform.TranslateY, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <TextBlock Margin="0,8,0,0" Text="Scale" />
-                            <TextBox Text="{Binding OverlayTransform.Scale, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <TextBlock Margin="0,8,0,0" Text="Rotation Degrees" />
-                            <TextBox Text="{Binding OverlayTransform.RotationDegrees, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
-                    </GroupBox>
-
-                    <GroupBox Header="Projection Visuals"
-                              Margin="0,12,0,0">
-                        <StackPanel Margin="8">
-                            <CheckBox Content="Show Grid"
-                                      IsChecked="{Binding ShowGrid}" />
-                            <CheckBox Margin="0,6,0,0"
-                                      Content="Show Center Crosshair"
-                                      IsChecked="{Binding ShowCenterCrosshair}" />
-
-                            <TextBlock Margin="0,8,0,0" Text="Opacity" />
-                            <Slider Minimum="0"
-                                    Maximum="1"
-                                    SmallChange="0.01"
-                                    Value="{Binding OverlayOpacity}" />
-
-                            <TextBlock Margin="0,8,0,0" Text="Brightness" />
-                            <Slider Minimum="0.1"
-                                    Maximum="2.0"
-                                    SmallChange="0.05"
-                                    Value="{Binding BrightnessMultiplier}" />
-                        </StackPanel>
-                    </GroupBox>
-
-                    <GroupBox Header="Calibration"
-                              Margin="0,12,0,0">
-                        <StackPanel Margin="8">
-                            <TextBlock Text="Workflow order: UL, UR, LR, LL" />
-                            <TextBlock Margin="0,4,0,0"
-                                       Text="{Binding CalibrationStatus}" />
-                            <Button Margin="0,8,0,0"
-                                    Content="Reset Calibration"
-                                    Click="OnResetCalibrationClick" />
-                        </StackPanel>
-                    </GroupBox>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- Right panel is the editor surface where background and overlay are composited. -->
-            <Border Grid.Column="1"
-                    Margin="12"
-                    BorderBrush="#444"
-                    BorderThickness="1"
-                    Background="#111">
-                <Grid>
-                    <!-- Background image layer. -->
-                    <Image Source="{Binding BackgroundImage}"
-                           Stretch="Uniform" />
-
-                    <!-- Overlay visualization layer. Placeholder polyline and frame for safe startup. -->
-                    <Canvas Background="Transparent">
-                        <Rectangle Stroke="Lime"
-                                   StrokeThickness="2"
-                                   Width="300"
-                                   Height="200"
-                                   Canvas.Left="50"
-                                   Canvas.Top="50"
-                                   Opacity="{Binding OverlayOpacity}" />
-                    </Canvas>
-                </Grid>
-            </Border>
-        </Grid>
-    </DockPanel>
+                <!-- Overlay canvas placeholder layer shown above image area. -->
+                <Border Margin="36"
+                        BorderBrush="#66FFCC00"
+                        BorderThickness="2"
+                        CornerRadius="4"
+                        IsHitTestVisible="False">
+                    <TextBlock HorizontalAlignment="Right"
+                               VerticalAlignment="Top"
+                               Margin="8"
+                               Foreground="#FFD369"
+                               FontSize="12"
+                               Text="Overlay Canvas (Phase 3)" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

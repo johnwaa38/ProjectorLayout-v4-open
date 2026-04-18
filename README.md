@@ -1,21 +1,27 @@
 # ProjectorLayout-v4-open
 
-Open version of **ProjectorLayout**, a WPF desktop application targeting **.NET 8** for projector alignment workflows.
+ProjectorLayout is a WPF desktop application targeting .NET 8.
 
-## Project structure
+## Current status
 
-- `ProjectorLayout.sln` — Visual Studio solution file.
-- `src/ProjectorLayout/ProjectorLayout.csproj` — WPF app project.
-- `src/ProjectorLayout/MainWindow.xaml` — main operator UI.
-- `src/ProjectorLayout/ViewModels` — state and command logic.
-- `src/ProjectorLayout/Models` — persistence and geometry models.
-- `src/ProjectorLayout/Services` — core I/O and projection services.
+This repository is currently at **Phase 1 (solution + app scaffold)**.
 
-## Build
+Implemented in this phase:
+- Visual Studio solution file
+- WPF project targeting `net8.0-windows`
+- `App.xaml` / `App.xaml.cs`
+- `MainWindow.xaml` / `MainWindow.xaml.cs`
+- Scaffold layout regions for:
+  - control panel
+  - image area
+  - overlay canvas
 
-On Windows with .NET 8 SDK installed:
+No functional image loading, transforms, calibration, projection, DXF import, or persistence are included in Phase 1.
+
+## Build and run (Windows)
 
 ```bash
 dotnet restore ProjectorLayout.sln
 dotnet build ProjectorLayout.sln
+dotnet run --project src/ProjectorLayout/ProjectorLayout.csproj
 ```
