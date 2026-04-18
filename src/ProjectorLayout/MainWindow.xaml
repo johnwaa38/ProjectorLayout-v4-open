@@ -10,20 +10,16 @@
         MinHeight="600"
         MinWidth="900"
         WindowStartupLocation="CenterScreen">
-    <!--
-      Phase 1 scaffold layout:
-      - Left panel: control panel placeholder
-      - Right panel: editor surface with image area + overlay canvas placeholders
-      This is intentionally non-functional in this phase to ensure a clean launch baseline.
-    -->
+    <!-- Phase 1 scaffold layout only: control panel + image area + overlay canvas regions. -->
     <Grid Background="#1E1E1E">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="320" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Control panel placeholder region. -->
+        <!-- Control panel placeholder region shown on the left side of the window. -->
         <Border Grid.Column="0"
+                x:Name="ControlPanelRegion"
                 Margin="12"
                 Padding="12"
                 Background="#2C2C2C"
@@ -42,8 +38,9 @@
             </StackPanel>
         </Border>
 
-        <!-- Editor placeholder contains both image and overlay placeholders. -->
+        <!-- Editor surface placeholder on the right where image and overlay layers are stacked. -->
         <Border Grid.Column="1"
+                x:Name="EditorSurfaceRegion"
                 Margin="12"
                 Padding="0"
                 Background="#111111"
@@ -53,6 +50,7 @@
             <Grid>
                 <!-- Image area placeholder layer. -->
                 <Border Margin="16"
+                        x:Name="ImageAreaRegion"
                         Background="#202020"
                         BorderBrush="#3A3A3A"
                         BorderThickness="1"
@@ -64,8 +62,9 @@
                                Text="Image Area (Phase 2)" />
                 </Border>
 
-                <!-- Overlay canvas placeholder layer shown above image area. -->
+                <!-- Overlay canvas placeholder layer rendered above the image area. -->
                 <Border Margin="36"
+                        x:Name="OverlayCanvasRegion"
                         BorderBrush="#66FFCC00"
                         BorderThickness="2"
                         CornerRadius="4"
