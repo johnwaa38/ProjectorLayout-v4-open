@@ -4,9 +4,9 @@ ProjectorLayout is a WPF desktop application targeting .NET 8.
 
 ## Current status
 
-This repository is currently at **Phase 1 (solution + app scaffold)**.
+This repository is currently at **Phase 2 (image load + display)**.
 
-Implemented in this phase:
+Implemented so far:
 - Visual Studio solution file
 - WPF project targeting `net8.0-windows`
 - `App.xaml` / `App.xaml.cs`
@@ -15,8 +15,10 @@ Implemented in this phase:
   - control panel
   - image area
   - overlay canvas
+- Image loading through a file dialog (`Load Image...` button)
+- Display of the selected image in the editor surface with aspect-ratio preserving scaling
 
-No functional image loading, transforms, calibration, projection, DXF import, or persistence are included in Phase 1.
+Not implemented yet: transforms, calibration, projection, DXF import, or persistence.
 
 ## Build and run (Windows)
 
