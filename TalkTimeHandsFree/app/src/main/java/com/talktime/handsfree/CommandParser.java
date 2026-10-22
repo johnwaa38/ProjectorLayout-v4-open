@@ -22,6 +22,8 @@ public final class CommandParser {
     private static final Pattern HOUR=Pattern.compile("^(\\d{1,2})(?:[:.](\\d{1,2}))?\\s*(am|pm)?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RANGE=Pattern.compile("\\b(?:from\\s+|worked\\s+)?"+TIME+"\\s*(?:to|till|until|through|\\-)\\s*"+TIME+"\\b");
     private static final Pattern SET=Pattern.compile("\\b(?:set|change|correct|update|record|make)\\s+(?:my\\s+)?(?:shift\\s+)?(?:start(?:ing)?(?:\\s+time)?|clock\\s*in\\s*time)\\s*(?:to|at|for|@)?\\s*"+TIME+"\\b");
+    private static final Pattern END=Pattern.compile("\\b(?:set|change|correct|update|record)\\s+(?:my\\s+)?(?:end|finish|stop|clock\\s*out)(?:\\s+time)?\\s*(?:to|at|for|@)?\\s*"+TIME+"\\b");
+    private static final Pattern FINISHED=Pattern.compile("\\b(?:i\\s+)?(?:finished|stopped|ended|left|got\\s+off)(?:\\s+work)?\\s*(?:at|around)?\\s*"+TIME+"\\b");
     private static final String[] WORDS={"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"};
     private static String normalized(String input) {
         String s=input.toLowerCase(Locale.US).replaceAll("([ap])\\.m\\.","$1m").replaceAll("\\s+"," ").trim();
@@ -60,6 +62,14 @@ public final class CommandParser {
         if(s.isBlank())return say("Say clock in, clock out, or set my start time to 1 PM.");
         if(s.matches(".*\\b(?:stop listening|turn off listening|stop talktime|go to sleep)\\b.*"))return new Command("stop",-1,-1,0,false,"");
         if(s.matches(".*\\b(?:what|how many|tell me|total|show)\\b.*\\b(?:hours|week|time|worked)\\b.*") || s.matches(".*\\b(?:hours this week|weekly hours|weekly total)\\b.*"))return new Command("summary",-1,-1,0,false,"");
+        Matcher end=END.matcher(s);
+        if(!end.find())end=FINISHED.matcher(s);
+        if(end.find(0)) {
+            int finish=minute(end.group(1).replaceAll("\\s+",""),false,false,-1);
+            if(finish==-2)return say("Please say A M or P M for your finish time.");
+            if(finish<0)return say("I couldn't understand your finish time.");
+            return new Command("finish",finish,-1,breakMinutes(s),yesterday,"");
+        }
         Matcher set=SET.matcher(s);
         if(set.find()) {
             int start=minute(set.group(1).replaceAll("\\s+",""),false,false,-1);
@@ -77,8 +87,11 @@ public final class CommandParser {
             int duration=b-a; if(duration<=0)duration+=1440;
             int br=breakMinutes(s);
             if(duration<15 || duration>1440 || br>=duration)return say("Those shift hours don't look right. Please repeat them.");
-            return new Command("range",a,b,br,yesterday,"");
+            return new Command(s.matches(".*\\b(?:correct|replace|update|change)\\b.*")?"replace":"range",a,b,br,yesterday,"");
         }
+        if(s.matches(".*\\b(?:yes|yep|yeah|correct|confirm|looks right|that is right|that's right|those are right|hours are right)\\b.*")
+           && !s.matches(".*\\b(?:set|change|update|finish|worked|start)\\b.*"))
+            return new Command("confirm",-1,-1,0,false,"");
         return say("I didn't catch that. Say clock in, clock out, or set my start time to 1 P M.");
     }
     private CommandParser(){}

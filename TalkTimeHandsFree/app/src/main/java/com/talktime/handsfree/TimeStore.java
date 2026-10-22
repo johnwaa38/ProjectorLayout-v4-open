@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.time.temporal.TemporalAdjusters;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -60,6 +61,46 @@ public final class TimeStore {
         add(c,start,stop,breakMinutes,"Voice shift entry");
         return "Saved "+formatHours((int)mins-breakMinutes)+" hours for "+(yesterday?"yesterday":"today")+".";
     }
+    /** Explicit finish command. Does not silently substitute the time the user speaks for the actual finish. */
+    public static synchronized String finishAt(Context c,int clockMinute,int breakMinutes,boolean yesterday){
+        long start=active(c);
+        LocalDate day=LocalDate.now().minusDays(yesterday?1:0);
+        long end=day.atStartOfDay(ZoneId.systemDefault()).plusMinutes(clockMinute).toInstant().toEpochMilli();
+        if(start==0)return "No running shift. Say I worked 8 AM to 4 PM to add a completed shift.";
+        if(end<=start)end=day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).plusMinutes(clockMinute).toInstant().toEpochMilli();
+        long mins=Math.round((end-start)/60000.0);
+        if(end>System.currentTimeMillis()+60000L)return "That finish time is in the future. Nothing saved.";
+        if(mins<1||mins>2160||breakMinutes<0||breakMinutes>=mins)return "That finish time or break doesn't look right. Nothing saved.";
+        add(c,start,end,breakMinutes,"Voice finish time");
+        preferences(c).edit().remove(ACTIVE).commit();
+        return "Saved a shift from "+hm(start)+" to "+hm(end)+", "+formatHours((int)mins-breakMinutes)+" paid hours. Please confirm your hours.";
+    }
+    public static synchronized String replaceRange(Context c,int a,int b,int breaks,boolean yesterday){
+        LocalDate day=LocalDate.now().minusDays(yesterday?1:0);
+        long start=day.atStartOfDay(ZoneId.systemDefault()).plusMinutes(a).toInstant().toEpochMilli();
+        long end=day.atStartOfDay(ZoneId.systemDefault()).plusMinutes(b).toInstant().toEpochMilli();
+        if(end<=start)end=day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).plusMinutes(b).toInstant().toEpochMilli();
+        long minutes=Math.round((end-start)/60000.0);
+        if(end>System.currentTimeMillis()+60000L||minutes<1||minutes>2160||breaks<0||breaks>=minutes)
+            return "Those hours don't look right. Nothing was changed.";
+        JSONArray old=array(c);JSONArray updated=new JSONArray();int matches=0;
+        for(int i=0;i<old.length();i++)try{
+            JSONObject o=old.getJSONObject(i);
+            if(day.toString().equals(o.optString("date")))matches++;
+        }catch(Exception ignored){}
+        if(matches==0)return "No existing shift on that day. Say I worked from 8 AM to 4 PM to add one.";
+        if(matches>1)return "That day has multiple shifts. Please edit them individually rather than replace the wrong one.";
+        for(int i=0;i<old.length();i++)try{
+            JSONObject o=old.getJSONObject(i);
+            if(day.toString().equals(o.optString("date"))){
+                o.put("start",start);o.put("end",end);o.put("breakMinutes",breaks);
+                o.put("minutes",(int)minutes-breaks);o.put("note","Voice corrected shift");
+            }
+            updated.put(o);
+        }catch(Exception ignored){}
+        if(!preferences(c).edit().putString(ENTRIES,updated.toString()).commit())return "Couldn't save the correction. Nothing changed.";
+        return "Corrected your shift to "+hm(start)+" through "+hm(end)+", "+formatHours((int)minutes-breaks)+" hours. Please confirm.";
+    }
     private static void add(Context c,long start,long stop,int breakMinutes,String note){
         try{
             JSONArray a=array(c);
@@ -76,10 +117,55 @@ public final class TimeStore {
             case "in":return clockIn(c);
             case "out":return clockOut(c,cmd.breakMinutes);
             case "set":return setStart(c,cmd.firstMinute,cmd.yesterday);
+            case "finish":return finishAt(c,cmd.firstMinute,cmd.breakMinutes,cmd.yesterday);
+            case "confirm":return confirmToday(c);
             case "range":return addRange(c,cmd.firstMinute,cmd.secondMinute,cmd.breakMinutes,cmd.yesterday);
+            case "replace":return replaceRange(c,cmd.firstMinute,cmd.secondMinute,cmd.breakMinutes,cmd.yesterday);
             case "summary":return summary(c);
             default:return cmd.message;
         }
+    }
+    public static synchronized String todayReport(Context c){
+        LocalDate today=LocalDate.now();
+        JSONArray entries=array(c);
+        int count=0, mins=0;
+        StringBuilder b=new StringBuilder();
+        long running=active(c);
+        for(int i=0;i<entries.length();i++)try{
+            JSONObject e=entries.getJSONObject(i);
+            if(!today.toString().equals(e.optString("date")))continue;
+            count++;mins+=e.getInt("minutes");
+            if(count<=3)b.append(count>1?"; ":"").append(hm(e.getLong("start"))).append(" to ").append(hm(e.getLong("end")))
+                    .append(" (break ").append(e.optInt("breakMinutes")).append(" min)");
+        }catch(Exception ignored){}
+        if(count>3)b.append("; plus ").append(count-3).append(" more shifts");
+        if(running>0 && date(running).equals(today.toString())){
+            return (count>0? b.toString()+". ":"")+"Started at "+hm(running)+". No finish time saved. When did you finish?";
+        }
+        if(running>0)return "A shift from "+hm(running)+" is still running. Please check and finish it.";
+        if(count==0)return "No completed hours recorded today. Did you work today?";
+        return b+". Total "+formatHours(mins)+" hours. Are these hours correct?"+(isTodayConfirmed(c)?" Confirmed.":"");
+    }
+    private static String todayFingerprint(Context c){
+        JSONArray entries=array(c);String d=LocalDate.now().toString();StringBuilder b=new StringBuilder(d);
+        for(int i=0;i<entries.length();i++)try{JSONObject e=entries.getJSONObject(i);
+            if(d.equals(e.optString("date")))b.append('|').append(e.optString("id")).append(':').append(e.optLong("start"))
+                .append(':').append(e.optLong("end")).append(':').append(e.optInt("breakMinutes"));
+        }catch(Exception ignored){}
+        return b.toString();
+    }
+    public static synchronized boolean isTodayConfirmed(Context c){
+        return entryCountToday(c)>0 && active(c)==0 && todayFingerprint(c).equals(preferences(c).getString("confirmed_today",""));
+    }
+    public static synchronized boolean hasCompletedToday(Context c){return entryCountToday(c)>0;}
+    private static int entryCountToday(Context c){int n=0;JSONArray a=array(c);String d=LocalDate.now().toString();
+        for(int i=0;i<a.length();i++)try{if(d.equals(a.getJSONObject(i).optString("date")))n++;}catch(Exception ignored){}return n;
+    }
+    public static synchronized String confirmToday(Context c){
+        if(active(c)!=0)return "You still have an open shift. Tell me when you finished first.";
+        if(entryCountToday(c)==0)return "No finished shifts recorded today. Tell me your start and finish times first.";
+        if(!preferences(c).edit().putString("confirmed_today",todayFingerprint(c)).commit())return "Could not save confirmation. Try again.";
+        return "Confirmed today's hours. Saved.";
     }
     public static String formatHours(int minutes){return String.format(Locale.US,"%.2f",minutes/60.0);}
     public static synchronized int weeklyMinutes(Context c){

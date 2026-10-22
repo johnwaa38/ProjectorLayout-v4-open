@@ -11,6 +11,7 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -33,6 +34,7 @@ final class LaunchVoice implements RecognitionListener {
     private boolean foreground=false;
     private boolean ttsReady=false;
     private String pendingSpoken;
+    private boolean reviewPromptPending=false;
 
     LaunchVoice(MainActivity activity){
         this.activity=activity;
@@ -44,10 +46,24 @@ final class LaunchVoice implements RecognitionListener {
                 }
             }
         });
+        if(tts!=null)tts.setOnUtteranceProgressListener(new UtteranceProgressListener(){
+            @Override public void onStart(String id){}
+            @Override public void onDone(String id){
+                if(id!=null&&id.startsWith("TalkTimeReview-"))handler.post(()->{
+                    if(foreground&&!destroyed){reviewPromptPending=false;arm(350);}
+                });
+            }
+            @Override public void onError(String id){
+                if(id!=null&&id.startsWith("TalkTimeReview-"))handler.post(()->{
+                    if(foreground&&!destroyed){reviewPromptPending=false;arm(1100);}
+                });
+            }
+        });
     }
     void onResume(){
         foreground=true;
-        if(activity.autoVoiceEnabled())arm(1450);
+        if(activity.consumeReviewRequest())promptForReview();
+        else if(activity.autoVoiceEnabled())arm(1450);
     }
     void onPause(){
         foreground=false;
@@ -67,6 +83,19 @@ final class LaunchVoice implements RecognitionListener {
     void startNow(){
         triedAgain=false;
         arm(150);
+    }
+    void promptForReview(){
+        triedAgain=false;
+        String spoken="TalkTime evening review. "+TimeStore.todayReport(activity)+" Say yes to confirm, or say your correct finish time.";
+        activity.setVoiceMessage(spoken);
+        handler.removeCallbacks(startAction);
+        reviewPromptPending=true;
+        if(ttsReady&&tts!=null){
+            tts.speak(spoken,TextToSpeech.QUEUE_FLUSH,null,"TalkTimeReview-"+System.nanoTime());
+        }else{
+            // Device without speech synthesis can still show the prompt and listen.
+            reviewPromptPending=false;arm(1600);
+        }
     }
     private void listen(){
         if(destroyed||!foreground||active||TimeStore.enabled(activity))return;

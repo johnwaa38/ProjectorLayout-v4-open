@@ -21,7 +21,8 @@ public final class MainActivity extends Activity {
     private static final int MIC_REQUEST=101,NOTIF_REQUEST=102,SAVE_REQUEST=103,IMPORT_REQUEST=104;
     private LinearLayout root, records;
     private TextView status,weekly,shiftStatus,voiceMessage;
-    private Button autoVoiceButton;
+    private Button autoVoiceButton, reminderButton;
+    private TextView reviewStatus;
     private LaunchVoice launchVoice;
     private Button toggle;
     private String exportContent,exportName;
@@ -45,6 +46,17 @@ public final class MainActivity extends Activity {
             if(on)launchVoice.startNow();
         });
         button("SPEAK A COMMAND NOW",true,()->launchVoice.startNow());
+        reminderButton=button("DAILY 7:30 PM HOURS REVIEW: ON",false,()->{
+            boolean enabled=!EveningReminder.enabled(this);
+            EveningReminder.setEnabled(this,enabled);
+            reminderButton.setText("DAILY 7:30 PM HOURS REVIEW: "+(enabled?"ON":"OFF"));
+            if(enabled)askNotificationPermission();
+        });
+        reviewStatus=text("Daily review not checked",15,muted,false);
+        button("REVIEW / CONFIRM TODAY",false,()->{
+            launchVoice.promptForReview();
+        });
+        text("Around 7:30 PM, TalkTime shows your actual start and finish times. Tap 'Looks right' to confirm or 'Review / correct' to answer by voice. Android may delay notifications.",13,muted,false);
         status=text("Voice listening: OFF",19,white,true);
         toggle=button("ENABLE HANDS-FREE LISTENING",true,()->toggleListening());
         text("Enable once while the app is open. Android displays a permanent microphone notification. Tap Stop at any time. Voice listening may stop if Android closes the service.",13,muted,false);
@@ -60,6 +72,8 @@ public final class MainActivity extends Activity {
         });
         text("Your records stay on this device. Export a backup regularly; uninstalling the app deletes local records. Android or your speech provider may process voice commands online.",13,muted,false);
         launchVoice=new LaunchVoice(this);
+        EveningReminder.schedule(this);
+        handler.postDelayed(this::askNotificationPermission,900);
         refresh();
     }
     boolean autoVoiceEnabled(){return getPreferences(MODE_PRIVATE).getBoolean("auto_voice",true);}
@@ -83,6 +97,19 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(55),1);p.setMargins(dp(3),dp(4),dp(3),dp(4));row.addView(x,p);
         LinearLayout.LayoutParams q=new LinearLayout.LayoutParams(0,dp(55),1);q.setMargins(dp(3),dp(4),dp(3),dp(4));row.addView(y,q);
         x.setOnClickListener(v->left.run());y.setOnClickListener(v->right.run());
+    }
+    private void askNotificationPermission(){
+        if(Build.VERSION.SDK_INT>=33 && EveningReminder.enabled(this) &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIF_REQUEST);
+        }
+    }
+    boolean consumeReviewRequest(){
+        Intent i=getIntent();
+        if(i!=null && i.getBooleanExtra("open_review",false)){
+            i.removeExtra("open_review"); return true;
+        }
+        return false;
     }
     private void toggleListening(){
         if(TimeStore.enabled(this)){
@@ -124,6 +151,8 @@ public final class MainActivity extends Activity {
         int min=TimeStore.weeklyMinutes(this),extra=Math.max(0,min-2400);
         weekly.setText("THIS WEEK: "+TimeStore.formatHours(min)+" HOURS"+(extra>0?"\nOVER 40 HRS: "+TimeStore.formatHours(extra):""));
         long active=TimeStore.active(this);
+        if(reminderButton!=null)reminderButton.setText("DAILY 7:30 PM HOURS REVIEW: "+(EveningReminder.enabled(this)?"ON":"OFF"));
+        if(reviewStatus!=null)reviewStatus.setText(TimeStore.todayReport(this));
         shiftStatus.setText(active==0?"Not clocked in":"ON THE CLOCK: "+Instant.ofEpochMilli(active).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE h:mm a",Locale.US)));
         records.removeAllViews();
         JSONArray a;
@@ -164,6 +193,12 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume(){super.onResume();handler.post(ticker);if(launchVoice!=null)launchVoice.onResume();}
     @Override protected void onPause(){handler.removeCallbacks(ticker);if(launchVoice!=null)launchVoice.onPause();super.onPause();}
-    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(launchVoice!=null&&autoVoiceEnabled())launchVoice.arm(1400);}
+    @Override protected void onNewIntent(Intent intent){
+        super.onNewIntent(intent);setIntent(intent);
+        if(launchVoice!=null){
+            if(consumeReviewRequest())launchVoice.promptForReview();
+            else if(autoVoiceEnabled())launchVoice.arm(1400);
+        }
+    }
     @Override protected void onDestroy(){if(launchVoice!=null)launchVoice.destroy();super.onDestroy();}
 }
