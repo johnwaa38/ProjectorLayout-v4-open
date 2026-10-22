@@ -20,7 +20,9 @@ import java.util.Locale;
 public final class MainActivity extends Activity {
     private static final int MIC_REQUEST=101,NOTIF_REQUEST=102,SAVE_REQUEST=103,IMPORT_REQUEST=104;
     private LinearLayout root, records;
-    private TextView status,weekly,shiftStatus;
+    private TextView status,weekly,shiftStatus,voiceMessage;
+    private Button autoVoiceButton;
+    private LaunchVoice launchVoice;
     private Button toggle;
     private String exportContent,exportName;
     private final Handler handler=new Handler(Looper.getMainLooper());
@@ -34,7 +36,15 @@ public final class MainActivity extends Activity {
         scroll.addView(root);setContentView(scroll);
         text("TALK TIME",30,white,true);
         text("HANDS-FREE WORK HOURS",13,cyan,true);
-        text("Say: 'Hey TalkTime, set my start time to 1 PM'",16,muted,false);
+        text("Hands-free: say 'Hey Google, open TalkTime'. Then speak your hours when TalkTime listens.",16,muted,false);
+        voiceMessage=text("Google launch: automatic voice command",16,cyan,true);
+        autoVoiceButton=button("AUTO-LISTEN ON OPEN: ON",false,()->{
+            boolean on=!autoVoiceEnabled();
+            getPreferences(MODE_PRIVATE).edit().putBoolean("auto_voice",on).apply();
+            autoVoiceButton.setText("AUTO-LISTEN ON OPEN: "+(on?"ON":"OFF"));
+            if(on)launchVoice.startNow();
+        });
+        button("SPEAK A COMMAND NOW",true,()->launchVoice.startNow());
         status=text("Voice listening: OFF",19,white,true);
         toggle=button("ENABLE HANDS-FREE LISTENING",true,()->toggleListening());
         text("Enable once while the app is open. Android displays a permanent microphone notification. Tap Stop at any time. Voice listening may stop if Android closes the service.",13,muted,false);
@@ -49,8 +59,12 @@ public final class MainActivity extends Activity {
             Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,IMPORT_REQUEST);
         });
         text("Your records stay on this device. Export a backup regularly; uninstalling the app deletes local records. Android or your speech provider may process voice commands online.",13,muted,false);
+        launchVoice=new LaunchVoice(this);
         refresh();
     }
+    boolean autoVoiceEnabled(){return getPreferences(MODE_PRIVATE).getBoolean("auto_voice",true);}
+    void setVoiceMessage(String message){if(voiceMessage!=null)voiceMessage.setText(message);}
+    void refreshFromVoice(){refresh();}
     private int dp(int value){return (int)(getResources().getDisplayMetrics().density*value+.5f);}
     private TextView text(String value,int size,int color,boolean bold){
         TextView v=new TextView(this);v.setText(value);v.setTextColor(color);v.setTextSize(size);v.setPadding(dp(3),dp(12),dp(3),dp(12));
@@ -86,6 +100,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onRequestPermissionsResult(int requestCode,String[] perms,int[] results){
         super.onRequestPermissionsResult(requestCode,perms,results);
+        if(requestCode==LaunchVoice.PERMISSION_REQUEST){launchVoice.onPermissionResult(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED);return;}
         if(requestCode==MIC_REQUEST){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startListening();else alert("Microphone permission is required for hands-free listening.");}
     }
     private void alert(String message){new AlertDialog.Builder(this).setTitle("TalkTime").setMessage(message).setPositiveButton("OK",(d,w)->refresh()).show();refresh();}
@@ -147,6 +162,8 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Cancel",null).show();
         }catch(Exception ex){alert("Could not read the backup file.");}}
     }
-    @Override protected void onResume(){super.onResume();handler.post(ticker);}
-    @Override protected void onPause(){handler.removeCallbacks(ticker);super.onPause();}
+    @Override protected void onResume(){super.onResume();handler.post(ticker);if(launchVoice!=null)launchVoice.onResume();}
+    @Override protected void onPause(){handler.removeCallbacks(ticker);if(launchVoice!=null)launchVoice.onPause();super.onPause();}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(launchVoice!=null&&autoVoiceEnabled())launchVoice.arm(1400);}
+    @Override protected void onDestroy(){if(launchVoice!=null)launchVoice.destroy();super.onDestroy();}
 }
