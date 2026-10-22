@@ -1,4 +1,4 @@
-name: Build TalkTime APK
+name: Build TalkTime APK 2.2
 on:
   push:
     branches: [talktime-handsfree-build]
