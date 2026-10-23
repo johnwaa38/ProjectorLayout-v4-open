@@ -35,6 +35,8 @@ final class LaunchVoice implements RecognitionListener {
     private boolean ttsReady=false;
     private String pendingSpoken;
     private boolean reviewPromptPending=false;
+    private boolean welcomeQueued=false;
+    private final Runnable welcomeAction = this::welcome;
 
     LaunchVoice(MainActivity activity){
         this.activity=activity;
@@ -49,12 +51,12 @@ final class LaunchVoice implements RecognitionListener {
         if(tts!=null)tts.setOnUtteranceProgressListener(new UtteranceProgressListener(){
             @Override public void onStart(String id){}
             @Override public void onDone(String id){
-                if(id!=null&&id.startsWith("TalkTimeReview-"))handler.post(()->{
-                    if(foreground&&!destroyed){reviewPromptPending=false;arm(350);}
+                if(id!=null && (id.startsWith("TalkTimeReview-") || id.startsWith("TalkTimePrompt-")))handler.post(()->{
+                    if(foreground&&!destroyed){reviewPromptPending=false;arm(450);}
                 });
             }
             @Override public void onError(String id){
-                if(id!=null&&id.startsWith("TalkTimeReview-"))handler.post(()->{
+                if(id!=null && (id.startsWith("TalkTimeReview-") || id.startsWith("TalkTimePrompt-")))handler.post(()->{
                     if(foreground&&!destroyed){reviewPromptPending=false;arm(1100);}
                 });
             }
@@ -63,16 +65,18 @@ final class LaunchVoice implements RecognitionListener {
     void onResume(){
         foreground=true;
         if(activity.consumeReviewRequest())promptForReview();
-        else if(activity.autoVoiceEnabled())arm(1450);
+        else if(activity.autoVoiceEnabled())promptOnOpen();
     }
     void onPause(){
         foreground=false;
         handler.removeCallbacks(startAction);
+        handler.removeCallbacks(welcomeAction);
+        welcomeQueued=false;
         if(recognizer!=null && active){try{recognizer.cancel();}catch(Exception ignored){}}
         active=false;
     }
     void onPermissionResult(boolean allowed){
-        if(allowed)arm(700);
+        if(allowed)promptOnOpen();
         else activity.setVoiceMessage("Microphone permission declined. Voice commands are off.");
     }
     void arm(long ms){
@@ -80,9 +84,39 @@ final class LaunchVoice implements RecognitionListener {
         handler.removeCallbacks(startAction);
         handler.postDelayed(startAction,ms);
     }
-    void startNow(){
+    // Assistant can hold audio focus briefly after launching TalkTime.
+    // Wait for TalkTime's activity to actually have focus before speaking or opening the mic.
+    void onWindowFocusChanged(boolean hasFocus){
+        if(hasFocus && foreground && welcomeQueued)handler.postDelayed(welcomeAction,950);
+        if(!hasFocus){
+            handler.removeCallbacks(welcomeAction);
+            handler.removeCallbacks(startAction);
+        }
+    }
+    void promptOnOpen(){
+        if(destroyed || TimeStore.enabled(activity))return;
         triedAgain=false;
-        arm(150);
+        welcomeQueued=true;
+        activity.setVoiceMessage("Waiting for Google to finish. TalkTime will say READY before listening.");
+        handler.removeCallbacks(welcomeAction);
+        if(foreground && activity.hasWindowFocus())handler.postDelayed(welcomeAction,1100);
+    }
+    private void welcome(){
+        if(!welcomeQueued || !foreground || destroyed || !activity.hasWindowFocus())return;
+        welcomeQueued=false;
+        triedAgain=false;
+        String prompt="TalkTime ready. Tell me your start or finish time.";
+        activity.setVoiceMessage(prompt);
+        if(ttsReady && tts!=null){
+            tts.speak(prompt,TextToSpeech.QUEUE_FLUSH,null,"TalkTimePrompt-"+System.nanoTime());
+        }else{
+            // No text-to-speech engine: still allow spoken commands without a tap.
+            arm(1400);
+        }
+    }
+    void startNow(){
+        // Also speak when the user manually invokes the in-app command button.
+        promptOnOpen();
     }
     void promptForReview(){
         triedAgain=false;
@@ -98,7 +132,7 @@ final class LaunchVoice implements RecognitionListener {
         }
     }
     private void listen(){
-        if(destroyed||!foreground||active||TimeStore.enabled(activity))return;
+        if(destroyed||!foreground||!activity.hasWindowFocus()||active||TimeStore.enabled(activity))return;
         if(activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
             activity.setVoiceMessage("Allow microphone access once to use voice commands.");
             activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},PERMISSION_REQUEST);
@@ -119,7 +153,7 @@ final class LaunchVoice implements RecognitionListener {
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,false);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,3);
             active=true;
-            activity.setVoiceMessage("Listening now. Say: set my start time to 1 PM.");
+            activity.setVoiceMessage("TalkTime is listening NOW. Say your start or finish time, without Hey Google.");
             recognizer.startListening(intent);
         }catch(Exception e){
             active=false;
@@ -168,7 +202,7 @@ final class LaunchVoice implements RecognitionListener {
             activity.setVoiceMessage("Speech recognition unavailable. Try Speak Now.");
         }
     }
-    @Override public void onReadyForSpeech(Bundle params){}
+    @Override public void onReadyForSpeech(Bundle params){activity.setVoiceMessage("MIC READY: TalkTime is listening. Say: I started at 1 PM.");}
     @Override public void onBeginningOfSpeech(){}
     @Override public void onRmsChanged(float rms){}
     @Override public void onBufferReceived(byte[] data){}

@@ -11,6 +11,10 @@ public class CommandParserTest {
     eq("set my start time to 1 PM","set",780);
     eq("set my start time to one p.m.","set",780);
     eq("set my start time to 1:00","say",-99);
+    eq("I started at 1 PM","set",780);
+    eq("I started working at 1 PM","set",780);
+    eq("Started work at 7 AM","set",420);
+    eq("I started at 1", "say",-99);
     eq("clock in","in",-99);
     eq("clock me out","out",-99);
     eq("how many hours this week","summary",-99);

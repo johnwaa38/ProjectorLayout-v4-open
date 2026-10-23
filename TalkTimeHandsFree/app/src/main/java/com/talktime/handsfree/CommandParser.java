@@ -22,6 +22,7 @@ public final class CommandParser {
     private static final Pattern HOUR=Pattern.compile("^(\\d{1,2})(?:[:.](\\d{1,2}))?\\s*(am|pm)?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RANGE=Pattern.compile("\\b(?:from\\s+|worked\\s+)?"+TIME+"\\s*(?:to|till|until|through|\\-)\\s*"+TIME+"\\b");
     private static final Pattern SET=Pattern.compile("\\b(?:set|change|correct|update|record|make)\\s+(?:my\\s+)?(?:shift\\s+)?(?:start(?:ing)?(?:\\s+time)?|clock\\s*in\\s*time)\\s*(?:to|at|for|@)?\\s*"+TIME+"\\b");
+    private static final Pattern STARTED=Pattern.compile("\\b(?:i\\s+)?(?:started|began|got\\s+to|started\\s+working|clocked\\s+in)(?:\\s+(?:work|working|my\\s+shift))?\\s*(?:at|around)?\\s*"+TIME+"\\b");
     private static final Pattern END=Pattern.compile("\\b(?:set|change|correct|update|record)\\s+(?:my\\s+)?(?:end|finish|stop|clock\\s*out)(?:\\s+time)?\\s*(?:to|at|for|@)?\\s*"+TIME+"\\b");
     private static final Pattern FINISHED=Pattern.compile("\\b(?:i\\s+)?(?:finished|stopped|ended|left|got\\s+off)(?:\\s+work)?\\s*(?:at|around)?\\s*"+TIME+"\\b");
     private static final String[] WORDS={"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"};
@@ -71,7 +72,8 @@ public final class CommandParser {
             return new Command("finish",finish,-1,breakMinutes(s),yesterday,"");
         }
         Matcher set=SET.matcher(s);
-        if(set.find()) {
+        if(!set.find(0))set=STARTED.matcher(s);
+        if(set.find(0)) {
             int start=minute(set.group(1).replaceAll("\\s+",""),false,false,-1);
             if(start==-2)return say("Please say A M or P M. For example, set my start time to 1 P M.");
             if(start<0)return say("I couldn't understand the start time.");

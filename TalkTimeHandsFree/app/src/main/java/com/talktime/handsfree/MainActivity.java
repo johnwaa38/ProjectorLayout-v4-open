@@ -37,7 +37,7 @@ public final class MainActivity extends Activity {
         scroll.addView(root);setContentView(scroll);
         text("TALK TIME",30,white,true);
         text("HANDS-FREE WORK HOURS",13,cyan,true);
-        text("Hands-free: say 'Hey Google, open TalkTime'. Then speak your hours when TalkTime listens.",16,muted,false);
+        text("Say 'Hey Google, open TalkTime'. WAIT until TalkTime says READY, then say 'I started at 1 PM'. Do not say Hey Google again.",16,muted,false);
         voiceMessage=text("Google launch: automatic voice command",16,cyan,true);
         autoVoiceButton=button("AUTO-LISTEN ON OPEN: ON",false,()->{
             boolean on=!autoVoiceEnabled();
@@ -197,8 +197,12 @@ public final class MainActivity extends Activity {
         super.onNewIntent(intent);setIntent(intent);
         if(launchVoice!=null){
             if(consumeReviewRequest())launchVoice.promptForReview();
-            else if(autoVoiceEnabled())launchVoice.arm(1400);
+            else if(autoVoiceEnabled())launchVoice.promptOnOpen();
         }
+    }
+    @Override public void onWindowFocusChanged(boolean hasFocus){
+        super.onWindowFocusChanged(hasFocus);
+        if(launchVoice!=null)launchVoice.onWindowFocusChanged(hasFocus);
     }
     @Override protected void onDestroy(){if(launchVoice!=null)launchVoice.destroy();super.onDestroy();}
 }
