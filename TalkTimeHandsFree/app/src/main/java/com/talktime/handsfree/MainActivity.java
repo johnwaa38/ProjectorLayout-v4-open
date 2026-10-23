@@ -20,7 +20,7 @@ import java.util.Locale;
 public final class MainActivity extends Activity {
     private static final int MIC_REQUEST=101,NOTIF_REQUEST=102,SAVE_REQUEST=103,IMPORT_REQUEST=104;
     private LinearLayout root, records;
-    private TextView status,weekly,shiftStatus,voiceMessage;
+    private TextView status,weekly,shiftStatus,voiceMessage,lastHeard,lastResult,lastSaved;
     private Button autoVoiceButton, reminderButton;
     private TextView reviewStatus;
     private LaunchVoice launchVoice;
@@ -35,10 +35,13 @@ public final class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
         root=new LinearLayout(this);root.setPadding(dp(18),dp(20),dp(18),dp(30));root.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(root);setContentView(scroll);
-        text("TALK TIME",30,white,true);
+        text("TALK TIME • 2.4",30,white,true);
         text("HANDS-FREE WORK HOURS",13,cyan,true);
-        text("Say 'Hey Google, open TalkTime'. WAIT until TalkTime says READY, then say 'I started at 1 PM'. Do not say Hey Google again.",16,muted,false);
-        voiceMessage=text("Google launch: automatic voice command",16,cyan,true);
+        text("Assistant shortcut: say 'Hey Google, open TalkTime Hours'. If it doesn't open, launch the TalkTime Hours icon manually. TalkTime must be visible before its microphone can listen.",16,muted,false);
+        voiceMessage=text("VOICE STATUS: Waiting for TalkTime to open",16,cyan,true);
+        lastHeard=text("HEARD: No speech recognized yet.",16,white,true);
+        lastResult=text("RESULT: No command processed yet.",16,muted,false);
+        lastSaved=text("LAST SAVE: No changes recorded by this version yet.",16,cyan,true);
         autoVoiceButton=button("AUTO-LISTEN ON OPEN: ON",false,()->{
             boolean on=!autoVoiceEnabled();
             getPreferences(MODE_PRIVATE).edit().putBoolean("auto_voice",on).apply();
@@ -62,9 +65,11 @@ public final class MainActivity extends Activity {
         text("Enable once while the app is open. Android displays a permanent microphone notification. Tap Stop at any time. Voice listening may stop if Android closes the service.",13,muted,false);
         weekly=text("THIS WEEK: 0.00 HOURS",25,white,true);
         shiftStatus=text("Not clocked in",17,cyan,true);
+        button("EDIT RUNNING START TIME",false,this::editRunningStart);
         rowButtons("Clock In","Clock Out",()->alert(TimeStore.clockIn(this)),()->alert(TimeStore.clockOut(this,0)));
         rowButtons("Set Start","Add Shift",this::promptStart,this::promptShift);
-        text("SAVED SHIFTS",21,white,true);
+        text("SAVED SHIFTS  •  TAP EDIT TO CORRECT",21,white,true);
+        text("Each saved shift below displays its start, finish, break and paid hours. Use EDIT to fix any of them. You'll see SAVED only after storage confirms the update.",13,muted,false);
         records=new LinearLayout(this);records.setOrientation(LinearLayout.VERTICAL);root.addView(records);
         rowButtons("Export CSV","Backup JSON",()->export("TalkTime-hours.csv",TimeStore.csv(this),"text/csv"),()->export("TalkTime-backup.json",TimeStore.json(this),"application/json"));
         button("RESTORE JSON BACKUP",false,()->{
@@ -130,7 +135,7 @@ public final class MainActivity extends Activity {
         if(requestCode==LaunchVoice.PERMISSION_REQUEST){launchVoice.onPermissionResult(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED);return;}
         if(requestCode==MIC_REQUEST){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startListening();else alert("Microphone permission is required for hands-free listening.");}
     }
-    private void alert(String message){new AlertDialog.Builder(this).setTitle("TalkTime").setMessage(message).setPositiveButton("OK",(d,w)->refresh()).show();refresh();}
+    private void alert(String message){TimeStore.response(this,message);new AlertDialog.Builder(this).setTitle("TalkTime").setMessage(message).setPositiveButton("OK",(d,w)->refresh()).show();refresh();}
     private void promptStart(){
         EditText input=new EditText(this);input.setSingleLine(true);input.setHint("1:00 PM");
         new AlertDialog.Builder(this).setTitle("Set today's start time").setView(input).setPositiveButton("Save",(d,w)->{
@@ -143,8 +148,58 @@ public final class MainActivity extends Activity {
             CommandParser.Command parsed=CommandParser.parse(input.getText().toString());alert(TimeStore.execute(this,parsed));
         }).setNegativeButton("Cancel",null).show();
     }
+    private EditText editorField(String label,String initial,LinearLayout form){
+        TextView title=new TextView(this);title.setText(label);title.setTextColor(muted);title.setTextSize(14);
+        title.setPadding(dp(2),dp(8),dp(2),dp(2));form.addView(title);
+        EditText field=new EditText(this);field.setSingleLine(true);field.setText(initial);field.setTextSize(18);
+        field.setTextColor(white);field.setSelectAllOnFocus(true);
+        form.addView(field,new LinearLayout.LayoutParams(-1,dp(52)));
+        return field;
+    }
+    private String dayAt(long ms){return Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate().toString();}
+    private String timeAt(long ms){return Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm a",Locale.US));}
+    private void editRunningStart(){
+        long start=TimeStore.active(this);
+        if(start==0){alert("No shift is currently running. Use 'Set Start' to enter your start time.");return;}
+        LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(20),dp(8),dp(20),0);
+        EditText date=editorField("Shift start date (YYYY-MM-DD)",dayAt(start),form);
+        EditText time=editorField("Start time (include AM or PM)",timeAt(start),form);
+        new AlertDialog.Builder(this).setTitle("Correct running start time")
+            .setView(form).setPositiveButton("Save correction",(d,w)->alert(TimeStore.editActiveStart(this,date.getText().toString(),time.getText().toString())))
+            .setNegativeButton("Cancel",null).show();
+    }
+    private void editShift(JSONObject shift){
+        final String id=shift.optString("id");
+        long start=shift.optLong("start"),end=shift.optLong("end");
+        LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(20),dp(5),dp(20),dp(15));
+        EditText date=editorField("Date (YYYY-MM-DD)",shift.optString("date",dayAt(start)),form);
+        EditText from=editorField("Start time (AM/PM or 24-hour)",timeAt(start),form);
+        EditText to=editorField("Finish time (AM/PM or 24-hour)",timeAt(end),form);
+        EditText breaks=editorField("Unpaid break (minutes)",String.valueOf(shift.optInt("breakMinutes")),form);
+        TextView hint=new TextView(this);hint.setText("Overnight shifts are supported. A finish earlier than the start means next day.");
+        hint.setTextSize(13);hint.setTextColor(muted);form.addView(hint);
+        ScrollView wrap=new ScrollView(this);wrap.setFillViewport(false);wrap.addView(form);
+        new AlertDialog.Builder(this).setTitle("Edit saved shift")
+            .setView(wrap).setPositiveButton("SAVE CHANGES",(d,w)->alert(TimeStore.editEntry(this,id,date.getText().toString(),from.getText().toString(),to.getText().toString(),breaks.getText().toString())))
+            .setNegativeButton("Cancel",null).show();
+    }
+    private void deleteShift(String id){
+        new AlertDialog.Builder(this).setTitle("Delete this shift?")
+          .setMessage("This cannot be undone unless you have a backup.")
+          .setPositiveButton("Delete",(d,w)->alert(TimeStore.delete(this,id)))
+          .setNegativeButton("Cancel",null).show();
+    }
+    private Button inlineButton(String label,Runnable action,LinearLayout row){
+        Button b=new Button(this);b.setAllCaps(false);b.setText(label);b.setTextColor(white);b.setTextSize(16);
+        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(panel));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(52),1);lp.setMargins(dp(3),dp(1),dp(3),dp(6));
+        row.addView(b,lp);b.setOnClickListener(v->action.run());return b;
+    }
     private void refresh(){
         if(status==null)return;
+        if(lastHeard!=null)lastHeard.setText("HEARD: "+TimeStore.lastHeard(this));
+        if(lastResult!=null)lastResult.setText("RESULT: "+TimeStore.lastResponse(this));
+        if(lastSaved!=null)lastSaved.setText("LAST SAVE: "+TimeStore.lastSaved(this));
         boolean on=TimeStore.enabled(this);
         status.setText("Voice listening: "+(on?"ON. Say 'Hey TalkTime'.":"OFF"));status.setTextColor(on?cyan:white);
         toggle.setText(on?"STOP HANDS-FREE LISTENING":"ENABLE HANDS-FREE LISTENING");
@@ -167,8 +222,9 @@ public final class MainActivity extends Activity {
             r.setText(e.optString("date")+"   "+TimeStore.formatHours(e.optInt("minutes"))+" hours\n"+from+"  →  "+until+"  •  "+e.optInt("breakMinutes")+"m break");
             r.setPadding(dp(12),dp(13),dp(12),dp(13));r.setBackgroundColor(panel);
             LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(5),0,dp(5));records.addView(r,p);
-            r.setOnLongClickListener(v->{new AlertDialog.Builder(this).setTitle("Delete this shift?").setMessage("This cannot be undone unless you have a backup.")
-                    .setPositiveButton("Delete",(dialog,which)->{TimeStore.delete(this,id);refresh();}).setNegativeButton("Cancel",null).show();return true;});
+            LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);records.addView(row);
+            inlineButton("EDIT",()->editShift(e),row);
+            inlineButton("DELETE",()->deleteShift(id),row);
         }
     }
     private void export(String name,String content,String mime){

@@ -103,6 +103,7 @@ public final class ListeningService extends Service implements RecognitionListen
         if(System.currentTimeMillis()<armedUntil){armedUntil=0;process(spoken);}
     }
     private void process(String spoken){
+        TimeStore.heard(this,spoken);
         CommandParser.Command command=CommandParser.parse(spoken);
         if("stop".equals(command.kind)){say("Hands-free listening is off.");handler.postDelayed(this::stopSelf,1100);return;}
         String answer;

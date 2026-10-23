@@ -66,3 +66,13 @@ The original optional TalkTime continuous foreground microphone service remains 
 ## 2.3: Spoken Google-to-TalkTime handoff
 
 When Google opens TalkTime, wait until Google releases the screen; TalkTime now says **“TalkTime ready. Tell me your start or finish time.”** and begins one recognition session *after* speaking. Say **“I started at 1 PM”**, **“Clock me out”**, or **“I finished at 5 PM”**, **without repeating Hey Google**. This is a two-stage exchange, not a native direct Google Assistant command. It requires Android microphone permission, audio focus and an installed speech recognizer. Google App Actions direct-phrase forwarding would require approved Play Store publication. The 7:30 PM daily review remains in this version. Tests of app launch and microphone still need an actual Android phone.
+
+## 2.4 Visible saves, editable shifts, and new launch name
+
+Android launcher label is now **TalkTime Hours** (package ID unchanged). Use **Hey Google, open TalkTime Hours**, with phone unlocked. Assistant launching a sideloaded app is controlled by Google and cannot be guaranteed. If Google does not find the app, open the **TalkTime Hours** icon and use the **SPEAK A COMMAND NOW** button. Opening through Google is not required for manual editing or records.
+
+The home screen has HEARD, RESULT and LAST SAVE status indicators. Completed shifts show date, start time, finish time, unpaid break, paid hours, and a separate **EDIT** button. Corrections use the original shift record's UUID, are validated, and commit back to local storage; an open shift's start may be edited as well. The date editor requires `YYYY-MM-DD`; time requires AM/PM (`8 AM`, `1:00 PM`) or explicit 24-hour time (`13:00`, `08:00`). The parser rejects an ambiguous `1:00` input, implausible durations and break minutes that exceed the shift. A finish earlier than start means the next calendar day.
+
+VersionCode 5 and VersionName `2.4 Editable shifts + saved status` distinguish this APK from previous releases. The launcher label change may take Android a moment to update. If APK update fails due to the GitHub runner signing with a different debug certificate, back up via **Backup JSON** before uninstalling.
+
+Compile checks do not prove Google Assistant speech-launch works on the phone; that requires an on-device test.

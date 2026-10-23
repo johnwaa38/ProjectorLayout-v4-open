@@ -173,6 +173,7 @@ final class LaunchVoice implements RecognitionListener {
             return;
         }
         String phrase=CommandParser.removeWake(words.get(0));
+        TimeStore.heard(activity,words.get(0));
         CommandParser.Command command=CommandParser.parse(phrase);
         if("say".equals(command.kind) && !triedAgain){
             retryOrFinish(command.message);
