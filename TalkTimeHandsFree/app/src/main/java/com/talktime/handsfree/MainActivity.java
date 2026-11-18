@@ -72,6 +72,7 @@ public final class MainActivity extends Activity {
         text("Each saved shift below displays its start, finish, break and paid hours. Use EDIT to fix any of them. You'll see SAVED only after storage confirms the update.",13,muted,false);
         records=new LinearLayout(this);records.setOrientation(LinearLayout.VERTICAL);root.addView(records);
         rowButtons("Export CSV","Backup JSON",()->export("TalkTime-hours.csv",TimeStore.csv(this),"text/csv"),()->export("TalkTime-backup.json",TimeStore.json(this),"application/json"));
+        button("CHECK STORAGE HEALTH",false,()->alert(TimeStore.storageDiagnostics(this)));
         button("RESTORE JSON BACKUP",false,()->{
             Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,IMPORT_REQUEST);
         });
