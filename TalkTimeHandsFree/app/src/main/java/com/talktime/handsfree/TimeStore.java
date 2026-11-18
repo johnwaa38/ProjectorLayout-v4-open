@@ -18,12 +18,37 @@ import java.util.UUID;
 /** The native store is authoritative: voice commands are saved without displaying the app. */
 public final class TimeStore {
     private static final String PREF="talktime_native_timesheet_v2", ENTRIES="entries", ACTIVE="started_at";
+    private static final String ENTRIES_MIRROR="entries_mirror_v3", ENTRIES_PREVIOUS="entries_previous_v3";
     public static SharedPreferences preferences(Context c){return c.getSharedPreferences(PREF,Context.MODE_PRIVATE);}
-    private static JSONArray array(Context c){try{return new JSONArray(preferences(c).getString(ENTRIES,"[]"));}catch(Exception e){return new JSONArray();}}
+    /** A malformed primary record must never silently become an empty timesheet. */
+    private static JSONArray array(Context c){
+        SharedPreferences p=preferences(c);
+        String primary=p.getString(ENTRIES,null), mirror=p.getString(ENTRIES_MIRROR,null);
+        if(primary==null && mirror==null)return new JSONArray();
+        if(primary!=null)try{return new JSONArray(primary);}catch(Exception ignored){}
+        if(mirror!=null)try{return new JSONArray(mirror);}catch(Exception ignored){}
+        String previous=p.getString(ENTRIES_PREVIOUS,null);
+        if(previous!=null)try{return new JSONArray(previous);}catch(Exception ignored){}
+        throw new IllegalStateException("Shift records cannot be read. Do not clear TalkTime's data.");
+    }
+    private static void commitEntries(Context c,JSONArray a){
+        SharedPreferences p=preferences(c);
+        String old=p.getString(ENTRIES,null), next=a.toString();
+        SharedPreferences.Editor e=p.edit().putString(ENTRIES,next).putString(ENTRIES_MIRROR,next);
+        if(old!=null)e.putString(ENTRIES_PREVIOUS,old);
+        if(!e.commit() || !next.equals(p.getString(ENTRIES,null)) || !next.equals(p.getString(ENTRIES_MIRROR,null)))
+            throw new IllegalStateException("Could not verify saved records.");
+    }
+    public static String storageDiagnostics(Context c){
+        SharedPreferences p=preferences(c);
+        try{return "Readable shifts: "+array(c).length()+". Main: "+p.contains(ENTRIES)+
+             ". Mirror: "+p.contains(ENTRIES_MIRROR)+". Active: "+(active(c)>0)+".";}
+        catch(Exception ex){return "STORAGE WARNING: "+ex.getMessage();}
+    }
     public static long active(Context c){return preferences(c).getLong(ACTIVE,0);}
     /** These values are written only when Android actually commits a changed record. */
     private static String saved(Context c,String result){
-        preferences(c).edit().putLong("last_saved_at",System.currentTimeMillis()).putString("last_saved_result",result).commit();
+        if(!preferences(c).edit().putLong("last_saved_at",System.currentTimeMillis()).putString("last_saved_result",result).commit())throw new IllegalStateException("Save acknowledgment failed.");
         return result;
     }
     public static void heard(Context c,String phrase){
@@ -44,7 +69,7 @@ public final class TimeStore {
     private static String date(long millis){return Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate().toString();}
     public static synchronized String clockIn(Context c){
         if(active(c)!=0)return "You're already clocked in, since "+hm(active(c))+".";
-        preferences(c).edit().putLong(ACTIVE,System.currentTimeMillis()).commit();
+        if(!preferences(c).edit().putLong(ACTIVE,System.currentTimeMillis()).commit())return "NOT SAVED: Clock in failed.";
         return saved(c,"Clocked in at "+hm(active(c))+". Saved.");
     }
     public static synchronized String setStart(Context c,int clockMinute,boolean yesterday){
@@ -53,7 +78,7 @@ public final class TimeStore {
         long age=System.currentTimeMillis()-t;
         if(age < -60000L)return "That start time is in the future. Say today's actual start time.";
         if(age>36L*3600000L)return "That's more than 36 hours ago. Add that shift using its start and end times.";
-        preferences(c).edit().putLong(ACTIVE,t).commit();
+        if(!preferences(c).edit().putLong(ACTIVE,t).commit())return "NOT SAVED: Start time write failed.";
         return saved(c,"Your start time is saved as "+hm(t)+(yesterday?" yesterday":" today")+".");
     }
     public static synchronized String clockOut(Context c,int breakMinutes){
@@ -64,7 +89,7 @@ public final class TimeStore {
         if(duration>2160)return "That shift is over 36 hours. I didn't change anything.";
         if(breakMinutes<0||breakMinutes>=duration)return "Your break can't be as long as the shift.";
         add(c,start,stop,breakMinutes,"Voice clock out");
-        preferences(c).edit().remove(ACTIVE).commit();
+        if(!preferences(c).edit().remove(ACTIVE).commit())return "Shift saved, but the running timer could not be cleared. Review before clocking in again.";
         return saved(c,"Clocked out. Saved "+formatHours((int)duration-breakMinutes)+" hours"+(breakMinutes>0?", minus "+breakMinutes+" minutes of break":"")+".");
     }
     public static synchronized String addRange(Context c,int a,int b,int breakMinutes,boolean yesterday){
@@ -89,7 +114,7 @@ public final class TimeStore {
         if(end>System.currentTimeMillis()+60000L)return "That finish time is in the future. Nothing saved.";
         if(mins<1||mins>2160||breakMinutes<0||breakMinutes>=mins)return "That finish time or break doesn't look right. Nothing saved.";
         add(c,start,end,breakMinutes,"Voice finish time");
-        preferences(c).edit().remove(ACTIVE).commit();
+        if(!preferences(c).edit().remove(ACTIVE).commit())return "Shift saved, but the running timer could not be cleared. Review before clocking in again.";
         return saved(c,"Saved a shift from "+hm(start)+" to "+hm(end)+", "+formatHours((int)mins-breakMinutes)+" paid hours. Please confirm your hours.");
     }
     public static synchronized String replaceRange(Context c,int a,int b,int breaks,boolean yesterday){
@@ -115,7 +140,7 @@ public final class TimeStore {
             }
             updated.put(o);
         }catch(Exception ignored){}
-        if(!preferences(c).edit().putString(ENTRIES,updated.toString()).commit())return "Couldn't save the correction. Nothing changed.";
+        try{commitEntries(c,updated);}catch(Exception ex){return "NOT SAVED: "+ex.getMessage();}
         return saved(c,"Corrected your shift to "+hm(start)+" through "+hm(end)+", "+formatHours((int)minutes-breaks)+" hours. Please confirm.");
     }
     private static void add(Context c,long start,long stop,int breakMinutes,String note){
@@ -126,7 +151,7 @@ public final class TimeStore {
             e.put("breakMinutes",breakMinutes);e.put("minutes",(int)Math.round((stop-start)/60000.0)-breakMinutes);
             e.put("date",date(start));e.put("note",note);
             a.put(e);
-            if(!preferences(c).edit().putString(ENTRIES,a.toString()).commit())throw new RuntimeException("Unable to save shift");
+            commitEntries(c,a);
         }catch(Exception ex){throw new IllegalStateException("Unable to save shift",ex);}
     }
     public static synchronized String execute(Context c,CommandParser.Command cmd){
@@ -214,7 +239,7 @@ public final class TimeStore {
             }
         }catch(Exception ex){return "NOT SAVED: Unable to edit this record.";}
         if(!found)return "NOT SAVED: That shift wasn't found. Refresh and try again.";
-        if(!preferences(c).edit().putString(ENTRIES,old.toString()).commit())return "NOT SAVED: Storage write failed.";
+        try{commitEntries(c,old);}catch(Exception ex){return "NOT SAVED: "+ex.getMessage();}
         return saved(c,"Edited "+edit.day+": "+hm(edit.start)+" to "+hm(edit.end)+", "+formatHours(edit.paidMinutes)+" paid hours.");
     }
     /** Adjust a still-open shift without discarding the existing completed entries. */
@@ -236,7 +261,7 @@ public final class TimeStore {
             if(id.equals(e.getString("id")))found=true;else updated.put(e);
         }catch(Exception ignored){}
         if(!found)return "NOT SAVED: Shift not found.";
-        if(!preferences(c).edit().putString(ENTRIES,updated.toString()).commit())return "NOT SAVED: Delete failed.";
+        try{commitEntries(c,updated);}catch(Exception ex){return "NOT SAVED: "+ex.getMessage();}
         return saved(c,"Shift deleted. "+updated.length()+" completed shifts remain.");
     }
     public static String csv(Context c){
@@ -259,7 +284,7 @@ public final class TimeStore {
             JSONArray incoming=data.getJSONArray("entries");if(incoming.length()>20000)return "Backup contains too many entries.";
             for(int i=0;i<incoming.length();i++){JSONObject o=incoming.getJSONObject(i);if(o.getInt("minutes")<1||o.getInt("minutes")>2160||o.getLong("end")<=o.getLong("start")||o.getString("id").length()>128)throw new IllegalArgumentException("Invalid entry");LocalDate.parse(o.getString("date"));}
             long restoredActive=data.optLong("active",0);if(restoredActive<0)throw new IllegalArgumentException("Invalid start");
-            if(!preferences(c).edit().putString(ENTRIES,incoming.toString()).putLong(ACTIVE,restoredActive).commit())return "Restore failed. Nothing was saved.";
+            commitEntries(c,incoming); if(!preferences(c).edit().putLong(ACTIVE,restoredActive).commit())return "Entries restored, but start time could not be saved.";
             return saved(c,"Restored "+incoming.length()+" shifts from backup.");
         }catch(Exception ex){return "Invalid backup. Your existing records were kept.";}
     }
