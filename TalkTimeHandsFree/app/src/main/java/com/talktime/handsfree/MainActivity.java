@@ -145,7 +145,7 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode,String[] perms,int[] results){
         super.onRequestPermissionsResult(requestCode,perms,results);
         if(requestCode==LaunchVoice.PERMISSION_REQUEST){launchVoice.onPermissionResult(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED);return;}
-        if(requestCode==MIC_REQUEST){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startListening();else alert("Microphone permission is required for hands-free listening.");}
+        if(requestCode==MIC_REQUEST){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)toggleListening();else alert("Microphone permission is required for hands-free listening.");}
     }
     private void alert(String message){TimeStore.response(this,message);new AlertDialog.Builder(this).setTitle("TalkTime").setMessage(message).setPositiveButton("OK",(d,w)->refresh()).show();refresh();}
     private void editOvertime(){
