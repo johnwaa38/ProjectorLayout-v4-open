@@ -132,7 +132,7 @@ public final class TimeStore {
             e.put("start",QuarterHour.nearest(start));e.put("end",QuarterHour.nearest(stop));
             e.put("breakMinutes",QuarterHour.nearestBreak(breakMinutes));
             e.put("minutes",QuarterHour.paidMinutes(start,stop,breakMinutes));
-            e.put("date",date(start));e.put("note",note);e.put("hourlyRateCents",PayTracker.rateCents(c));
+            e.put("date",date(QuarterHour.nearest(start)));e.put("note",note);e.put("hourlyRateCents",PayTracker.rateCents(c));
             a.put(e);
             if(!preferences(c).edit().putString(ENTRIES,a.toString()).commit())throw new RuntimeException("Unable to save shift");
         }catch(Exception ex){throw new IllegalStateException("Unable to save shift",ex);}
