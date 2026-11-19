@@ -246,7 +246,7 @@ public final class TimeStore {
             JSONObject e=a.getJSONObject(i);
             s.append(e.optString("date")).append(',').append(hm(e.getLong("start"))).append(',').append(hm(e.getLong("end"))).append(',');
             s.append(e.getInt("breakMinutes")).append(',').append(formatHours(e.getInt("minutes"))).append(',');
-            long gross=PayTracker.shiftCents(e);
+            long gross=PayTracker.shiftCents(a.toString(),e,PayTracker.overtimeEnabled(c));
             s.append(e.has("hourlyRateCents")?String.format(Locale.US,"%.2f",e.optLong("hourlyRateCents")/100.0):"").append(',');
             s.append(gross>=0?String.format(Locale.US,"%.2f",gross/100.0):"").append(',');
             s.append('"').append(e.optString("note","").replace("\"","\"\"")).append('"').append('\n');
@@ -254,7 +254,7 @@ public final class TimeStore {
         return s.toString();
     }
     public static String json(Context c){try{
-        JSONObject obj=new JSONObject();obj.put("format","talktime-handsfree-2");obj.put("entries",array(c));obj.put("active",active(c));obj.put("hourlyRateCents",PayTracker.rateCents(c));return obj.toString(2);
+        JSONObject obj=new JSONObject();obj.put("format","talktime-handsfree-2");obj.put("entries",array(c));obj.put("active",active(c));obj.put("hourlyRateCents",PayTracker.rateCents(c));obj.put("overtimeEnabled",PayTracker.overtimeEnabled(c));return obj.toString(2);
     }catch(Exception e){return "{}";}}
     public static synchronized String restore(Context c,String input){
         try{
@@ -267,6 +267,7 @@ public final class TimeStore {
                 long cents=data.optLong("hourlyRateCents",-1);
                 if(cents>=0 && cents<=10000000)PayTracker.setRate(c,String.format(Locale.US,"%.2f",cents/100.0));
             }
+            if(data.has("overtimeEnabled"))PayTracker.setOvertimeEnabled(c,data.optBoolean("overtimeEnabled",false));
             return saved(c,"Restored "+incoming.length()+" shifts from backup.");
         }catch(Exception ex){return "Invalid backup. Your existing records were kept.";}
     }
