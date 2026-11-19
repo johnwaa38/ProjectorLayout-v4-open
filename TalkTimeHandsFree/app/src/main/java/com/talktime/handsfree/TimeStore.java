@@ -240,12 +240,15 @@ public final class TimeStore {
         return saved(c,"Shift deleted. "+updated.length()+" completed shifts remain.");
     }
     public static String csv(Context c){
-        StringBuilder s=new StringBuilder("Date,Start,End,Break minutes,Hours,Notes\n");
+        StringBuilder s=new StringBuilder("Date,Start,End,Break minutes,Hours,Hourly rate USD,Gross pay USD,Notes\n");
         JSONArray a=array(c);
         for(int i=0;i<a.length();i++)try{
             JSONObject e=a.getJSONObject(i);
             s.append(e.optString("date")).append(',').append(hm(e.getLong("start"))).append(',').append(hm(e.getLong("end"))).append(',');
             s.append(e.getInt("breakMinutes")).append(',').append(formatHours(e.getInt("minutes"))).append(',');
+            long gross=PayTracker.shiftCents(e);
+            s.append(e.has("hourlyRateCents")?String.format(Locale.US,"%.2f",e.optLong("hourlyRateCents")/100.0):"").append(',');
+            s.append(gross>=0?String.format(Locale.US,"%.2f",gross/100.0):"").append(',');
             s.append('"').append(e.optString("note","").replace("\"","\"\"")).append('"').append('\n');
         }catch(Exception ignored){}
         return s.toString();
