@@ -124,7 +124,7 @@ public final class TimeStore {
             JSONObject e=new JSONObject();
             e.put("id",UUID.randomUUID().toString());e.put("start",start);e.put("end",stop);
             e.put("breakMinutes",breakMinutes);e.put("minutes",(int)Math.round((stop-start)/60000.0)-breakMinutes);
-            e.put("date",date(start));e.put("note",note);
+            e.put("date",date(start));e.put("note",note);e.put("hourlyRateCents",PayTracker.rateCents(c));
             a.put(e);
             if(!preferences(c).edit().putString(ENTRIES,a.toString()).commit())throw new RuntimeException("Unable to save shift");
         }catch(Exception ex){throw new IllegalStateException("Unable to save shift",ex);}
@@ -251,7 +251,7 @@ public final class TimeStore {
         return s.toString();
     }
     public static String json(Context c){try{
-        JSONObject obj=new JSONObject();obj.put("format","talktime-handsfree-2");obj.put("entries",array(c));obj.put("active",active(c));return obj.toString(2);
+        JSONObject obj=new JSONObject();obj.put("format","talktime-handsfree-2");obj.put("entries",array(c));obj.put("active",active(c));obj.put("hourlyRateCents",PayTracker.rateCents(c));return obj.toString(2);
     }catch(Exception e){return "{}";}}
     public static synchronized String restore(Context c,String input){
         try{
@@ -260,6 +260,10 @@ public final class TimeStore {
             for(int i=0;i<incoming.length();i++){JSONObject o=incoming.getJSONObject(i);if(o.getInt("minutes")<1||o.getInt("minutes")>2160||o.getLong("end")<=o.getLong("start")||o.getString("id").length()>128)throw new IllegalArgumentException("Invalid entry");LocalDate.parse(o.getString("date"));}
             long restoredActive=data.optLong("active",0);if(restoredActive<0)throw new IllegalArgumentException("Invalid start");
             if(!preferences(c).edit().putString(ENTRIES,incoming.toString()).putLong(ACTIVE,restoredActive).commit())return "Restore failed. Nothing was saved.";
+            if(data.has("hourlyRateCents")) {
+                long cents=data.optLong("hourlyRateCents",-1);
+                if(cents>=0 && cents<=10000000)PayTracker.setRate(c,String.format(Locale.US,"%.2f",cents/100.0));
+            }
             return saved(c,"Restored "+incoming.length()+" shifts from backup.");
         }catch(Exception ex){return "Invalid backup. Your existing records were kept.";}
     }
