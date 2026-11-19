@@ -31,11 +31,16 @@ public final class MainActivity extends Activity {
     private final int bg=Color.rgb(11,18,32),panel=Color.rgb(22,34,52),white=Color.rgb(245,249,255),muted=Color.rgb(169,187,209),cyan=Color.rgb(96,218,230);
 
     @Override public void onCreate(Bundle state){super.onCreate(state);
+        // A prior always-on session must never be silently resumed on upgrade.
+        if(TimeStore.enabled(this)){
+            stopService(new Intent(this,ListeningService.class));
+            TimeStore.enabled(this,false);
+        }
         getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
         root=new LinearLayout(this);root.setPadding(dp(18),dp(20),dp(18),dp(30));root.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(root);setContentView(scroll);
-        text("TALK TIME • 2.4",30,white,true);
+        text("TALK TIME • 2.6",30,white,true);
         text("HANDS-FREE WORK HOURS",13,cyan,true);
         text("Assistant shortcut: say 'Hey Google, open TalkTime Hours'. If it doesn't open, launch the TalkTime Hours icon manually. TalkTime must be visible before its microphone can listen.",16,muted,false);
         voiceMessage=text("VOICE STATUS: Waiting for TalkTime to open",16,cyan,true);
@@ -61,8 +66,8 @@ public final class MainActivity extends Activity {
         });
         text("Around 7:30 PM, TalkTime shows your actual start and finish times. Tap 'Looks right' to confirm or 'Review / correct' to answer by voice. Android may delay notifications.",13,muted,false);
         status=text("Voice listening: OFF",19,white,true);
-        toggle=button("ENABLE HANDS-FREE LISTENING",true,()->toggleListening());
-        text("Enable once while the app is open. Android displays a permanent microphone notification. Tap Stop at any time. Voice listening may stop if Android closes the service.",13,muted,false);
+        toggle=button("LEGACY CONTINUOUS MICROPHONE (OPTIONAL)",false,()->toggleListening());
+        text("Music-safe default: no background microphone. Use Hey Google to launch a short TalkTime voice session where supported. Legacy listening can interrupt Bluetooth music.",13,muted,false);
         weekly=text("THIS WEEK: 0.00 HOURS",25,white,true);
         paySummary=text("HOURLY RATE: Not set",21,cyan,true);
         button("SET / CHANGE HOURLY PAY",false,this::editHourlyPay);
@@ -125,7 +130,10 @@ public final class MainActivity extends Activity {
             stopService(new Intent(this,ListeningService.class));TimeStore.enabled(this,false);refresh();return;
         }
         if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},MIC_REQUEST);return;}
-        startListening();
+        new AlertDialog.Builder(this).setTitle("Continuous microphone can interrupt music")
+            .setMessage("Android speech recognition repeatedly activates the microphone in this legacy mode. It can beep, pause Bluetooth music and drain the battery. Enable anyway?")
+            .setPositiveButton("ENABLE ANYWAY",(d,w)->startListening())
+            .setNegativeButton("CANCEL",null).show();
     }
     private void startListening(){
         try{
@@ -229,7 +237,7 @@ public final class MainActivity extends Activity {
         if(lastSaved!=null)lastSaved.setText("LAST SAVE: "+TimeStore.lastSaved(this));
         boolean on=TimeStore.enabled(this);
         status.setText("Voice listening: "+(on?"ON. Say 'Hey TalkTime'.":"OFF"));status.setTextColor(on?cyan:white);
-        toggle.setText(on?"STOP HANDS-FREE LISTENING":"ENABLE HANDS-FREE LISTENING");
+        toggle.setText(on?"STOP CONTINUOUS MICROPHONE":"ENABLE LEGACY CONTINUOUS MICROPHONE (MAY INTERRUPT MUSIC)");
         int min=TimeStore.weeklyMinutes(this),extra=Math.max(0,min-2400);
         weekly.setText("THIS WEEK: "+TimeStore.formatHours(min)+" HOURS"+(extra>0?"\nOVER 40 HRS: "+TimeStore.formatHours(extra):""));
         if(paySummary!=null){
