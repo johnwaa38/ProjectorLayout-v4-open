@@ -1,7 +1,7 @@
-name: Build TalkTime APK 2.2
+name: Build TalkTime APK 2.6
 on:
   push:
-    branches: [talktime-handsfree-build]
+    branches: [talktime-handsfree-build, talktime-pay-tracker]
   workflow_dispatch:
 jobs:
   apk:
