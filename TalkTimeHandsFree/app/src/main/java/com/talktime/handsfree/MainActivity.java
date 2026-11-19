@@ -20,7 +20,7 @@ import java.util.Locale;
 public final class MainActivity extends Activity {
     private static final int MIC_REQUEST=101,NOTIF_REQUEST=102,SAVE_REQUEST=103,IMPORT_REQUEST=104;
     private LinearLayout root, records;
-    private TextView status,weekly,shiftStatus,voiceMessage,lastHeard,lastResult,lastSaved;
+    private TextView status,weekly,shiftStatus,voiceMessage,lastHeard,lastResult,lastSaved,paySummary;
     private Button autoVoiceButton, reminderButton;
     private TextView reviewStatus;
     private LaunchVoice launchVoice;
@@ -64,6 +64,9 @@ public final class MainActivity extends Activity {
         toggle=button("ENABLE HANDS-FREE LISTENING",true,()->toggleListening());
         text("Enable once while the app is open. Android displays a permanent microphone notification. Tap Stop at any time. Voice listening may stop if Android closes the service.",13,muted,false);
         weekly=text("THIS WEEK: 0.00 HOURS",25,white,true);
+        paySummary=text("HOURLY RATE: Not set",21,cyan,true);
+        button("SET / CHANGE HOURLY PAY",false,this::editHourlyPay);
+        text("Gross earnings estimate, before taxes. New shifts remember their hourly rate. Old shifts with no recorded rate remain unpriced.",13,muted,false);
         shiftStatus=text("Not clocked in",17,cyan,true);
         button("EDIT RUNNING START TIME",false,this::editRunningStart);
         rowButtons("Clock In","Clock Out",()->alert(TimeStore.clockIn(this)),()->alert(TimeStore.clockOut(this,0)));
@@ -136,6 +139,19 @@ public final class MainActivity extends Activity {
         if(requestCode==MIC_REQUEST){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startListening();else alert("Microphone permission is required for hands-free listening.");}
     }
     private void alert(String message){TimeStore.response(this,message);new AlertDialog.Builder(this).setTitle("TalkTime").setMessage(message).setPositiveButton("OK",(d,w)->refresh()).show();refresh();}
+    private void editHourlyPay(){
+        EditText input=new EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setSingleLine(true);
+        input.setText(String.format(Locale.US,"%.2f",PayTracker.rateCents(this)/100.0));
+        input.setSelectAllOnFocus(true);
+        new AlertDialog.Builder(this).setTitle("Hourly pay (USD)")
+            .setMessage("Enter gross dollars per hour. Future shifts use this rate; existing shift rates stay unchanged.")
+            .setView(input).setPositiveButton("SAVE",(d,w)->{
+                boolean ok=PayTracker.setRate(this,input.getText().toString());
+                alert(ok?"Hourly rate saved. Future shifts will use it.":"Invalid pay rate. Use 0 to 100000 with at most 2 decimal places.");
+            }).setNegativeButton("Cancel",null).show();
+    }
     private void promptStart(){
         EditText input=new EditText(this);input.setSingleLine(true);input.setHint("1:00 PM");
         new AlertDialog.Builder(this).setTitle("Set today's start time").setView(input).setPositiveButton("Save",(d,w)->{
@@ -205,6 +221,13 @@ public final class MainActivity extends Activity {
         toggle.setText(on?"STOP HANDS-FREE LISTENING":"ENABLE HANDS-FREE LISTENING");
         int min=TimeStore.weeklyMinutes(this),extra=Math.max(0,min-2400);
         weekly.setText("THIS WEEK: "+TimeStore.formatHours(min)+" HOURS"+(extra>0?"\nOVER 40 HRS: "+TimeStore.formatHours(extra):""));
+        if(paySummary!=null){
+            String entries=TimeStore.allEntries(this);
+            int unknown=PayTracker.unpricedCount(entries);
+            paySummary.setText("HOURLY RATE: "+PayTracker.dollars(PayTracker.rateCents(this))+"/hr"+
+                "\nTHIS WEEK'S RECORDED GROSS PAY: "+PayTracker.dollars(PayTracker.weekCents(entries))+
+                (unknown>0?"\n"+unknown+" old shift(s) have no saved pay rate.":""));
+        }
         long active=TimeStore.active(this);
         if(reminderButton!=null)reminderButton.setText("DAILY 7:30 PM HOURS REVIEW: "+(EveningReminder.enabled(this)?"ON":"OFF"));
         if(reviewStatus!=null)reviewStatus.setText(TimeStore.todayReport(this));
@@ -219,7 +242,10 @@ public final class MainActivity extends Activity {
             TextView r=new TextView(this);r.setTextColor(white);r.setTextSize(15);
             String from=Instant.ofEpochMilli(e.optLong("start")).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm a",Locale.US));
             String until=Instant.ofEpochMilli(e.optLong("end")).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm a",Locale.US));
-            r.setText(e.optString("date")+"   "+TimeStore.formatHours(e.optInt("minutes"))+" hours\n"+from+"  →  "+until+"  •  "+e.optInt("breakMinutes")+"m break");
+            long gross=PayTracker.shiftCents(e);
+            r.setText(e.optString("date")+"   "+TimeStore.formatHours(e.optInt("minutes"))+" hours"+
+                (gross>=0?"  •  "+PayTracker.dollars(gross)+" gross":"  •  pay rate not recorded")+
+                "\n"+from+"  →  "+until+"  •  "+e.optInt("breakMinutes")+"m break");
             r.setPadding(dp(12),dp(13),dp(12),dp(13));r.setBackgroundColor(panel);
             LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(5),0,dp(5));records.addView(r,p);
             LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);records.addView(row);
