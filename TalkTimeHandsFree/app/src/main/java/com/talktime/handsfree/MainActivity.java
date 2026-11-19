@@ -144,7 +144,7 @@ public final class MainActivity extends Activity {
         boolean enabled=PayTracker.overtimeEnabled(this);
         new AlertDialog.Builder(this).setTitle("Weekly overtime")
             .setMessage("Current mode: "+(enabled?"1.5× after 40 hours":"STRAIGHT TIME")+
-                "\\n\\nChoose whether to calculate 1.5× pay after 40 paid hours in a Monday–Sunday week. This changes estimates only; saved hours and hourly rates stay untouched.")
+                "\n\nChoose whether to calculate 1.5× pay after 40 paid hours in a Monday–Sunday week. This changes estimates only; saved hours and hourly rates stay untouched.")
             .setPositiveButton(enabled?"TURN OFF OVERTIME":"TURN ON OVERTIME",(d,w)->{
                 boolean ok=PayTracker.setOvertimeEnabled(this,!enabled);
                 alert(ok?"Overtime setting saved.":"Could not save overtime setting.");
@@ -236,7 +236,7 @@ public final class MainActivity extends Activity {
             String entries=TimeStore.allEntries(this);
             int unknown=PayTracker.unpricedCount(entries);
             paySummary.setText("HOURLY RATE: "+PayTracker.dollars(PayTracker.rateCents(this))+"/hr"+
-                "\\nPAY MODE: "+(PayTracker.overtimeEnabled(this)?"1.5× OVER 40 HRS":"STRAIGHT TIME")+
+                "\nPAY MODE: "+(PayTracker.overtimeEnabled(this)?"1.5× OVER 40 HRS":"STRAIGHT TIME")+
                 "\nTHIS WEEK'S RECORDED GROSS PAY: "+PayTracker.dollars(PayTracker.weekCents(entries,PayTracker.overtimeEnabled(this)))+
                 (unknown>0?"\n"+unknown+" old shift(s) have no saved pay rate.":""));
         }
