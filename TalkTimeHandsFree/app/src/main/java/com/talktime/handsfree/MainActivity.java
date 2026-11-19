@@ -66,6 +66,7 @@ public final class MainActivity extends Activity {
         weekly=text("THIS WEEK: 0.00 HOURS",25,white,true);
         paySummary=text("HOURLY RATE: Not set",21,cyan,true);
         button("SET / CHANGE HOURLY PAY",false,this::editHourlyPay);
+        button("OVERTIME SETTINGS",false,this::editOvertime);
         text("Gross earnings estimate, before taxes. New shifts remember their hourly rate. Old shifts with no recorded rate remain unpriced.",13,muted,false);
         shiftStatus=text("Not clocked in",17,cyan,true);
         button("EDIT RUNNING START TIME",false,this::editRunningStart);
@@ -139,6 +140,16 @@ public final class MainActivity extends Activity {
         if(requestCode==MIC_REQUEST){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startListening();else alert("Microphone permission is required for hands-free listening.");}
     }
     private void alert(String message){TimeStore.response(this,message);new AlertDialog.Builder(this).setTitle("TalkTime").setMessage(message).setPositiveButton("OK",(d,w)->refresh()).show();refresh();}
+    private void editOvertime(){
+        boolean enabled=PayTracker.overtimeEnabled(this);
+        new AlertDialog.Builder(this).setTitle("Weekly overtime")
+            .setMessage("Current mode: "+(enabled?"1.5× after 40 hours":"STRAIGHT TIME")+
+                "\\n\\nChoose whether to calculate 1.5× pay after 40 paid hours in a Monday–Sunday week. This changes estimates only; saved hours and hourly rates stay untouched.")
+            .setPositiveButton(enabled?"TURN OFF OVERTIME":"TURN ON OVERTIME",(d,w)->{
+                boolean ok=PayTracker.setOvertimeEnabled(this,!enabled);
+                alert(ok?"Overtime setting saved.":"Could not save overtime setting.");
+            }).setNegativeButton("Cancel",null).show();
+    }
     private void editHourlyPay(){
         EditText input=new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -225,7 +236,8 @@ public final class MainActivity extends Activity {
             String entries=TimeStore.allEntries(this);
             int unknown=PayTracker.unpricedCount(entries);
             paySummary.setText("HOURLY RATE: "+PayTracker.dollars(PayTracker.rateCents(this))+"/hr"+
-                "\nTHIS WEEK'S RECORDED GROSS PAY: "+PayTracker.dollars(PayTracker.weekCents(entries))+
+                "\\nPAY MODE: "+(PayTracker.overtimeEnabled(this)?"1.5× OVER 40 HRS":"STRAIGHT TIME")+
+                "\nTHIS WEEK'S RECORDED GROSS PAY: "+PayTracker.dollars(PayTracker.weekCents(entries,PayTracker.overtimeEnabled(this)))+
                 (unknown>0?"\n"+unknown+" old shift(s) have no saved pay rate.":""));
         }
         long active=TimeStore.active(this);
@@ -242,7 +254,7 @@ public final class MainActivity extends Activity {
             TextView r=new TextView(this);r.setTextColor(white);r.setTextSize(15);
             String from=Instant.ofEpochMilli(e.optLong("start")).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm a",Locale.US));
             String until=Instant.ofEpochMilli(e.optLong("end")).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("h:mm a",Locale.US));
-            long gross=PayTracker.shiftCents(e);
+            long gross=PayTracker.shiftCents(TimeStore.allEntries(this),e,PayTracker.overtimeEnabled(this));
             r.setText(e.optString("date")+"   "+TimeStore.formatHours(e.optInt("minutes"))+" hours"+
                 (gross>=0?"  •  "+PayTracker.dollars(gross)+" gross":"  •  pay rate not recorded")+
                 "\n"+from+"  →  "+until+"  •  "+e.optInt("breakMinutes")+"m break");
