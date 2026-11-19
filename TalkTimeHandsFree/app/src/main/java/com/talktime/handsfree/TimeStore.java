@@ -45,7 +45,7 @@ public final class TimeStore {
     public static synchronized String clockIn(Context c){
         if(active(c)!=0)return "You're already clocked in, since "+hm(active(c))+".";
         preferences(c).edit().putLong(ACTIVE,System.currentTimeMillis()).commit();
-        return saved(c,"Clocked in at "+hm(active(c))+". Saved.");
+        return saved(c,"Clocked in: "+hm(QuarterHour.nearest(active(c)))+" (nearest 15 minutes). Original time retained.");
     }
     public static synchronized String setStart(Context c,int clockMinute,boolean yesterday){
         LocalDate day=LocalDate.now().minusDays(yesterday?1:0);
@@ -54,7 +54,7 @@ public final class TimeStore {
         if(age < -60000L)return "That start time is in the future. Say today's actual start time.";
         if(age>36L*3600000L)return "That's more than 36 hours ago. Add that shift using its start and end times.";
         preferences(c).edit().putLong(ACTIVE,t).commit();
-        return saved(c,"Your start time is saved as "+hm(t)+(yesterday?" yesterday":" today")+".");
+        return saved(c,"Start: "+hm(QuarterHour.nearest(t))+(yesterday?" yesterday":" today")+" (nearest 15 minutes).");
     }
     public static synchronized String clockOut(Context c,int breakMinutes){
         long start=active(c),stop=System.currentTimeMillis();
@@ -63,9 +63,10 @@ public final class TimeStore {
         if(duration<1)return "It's been less than one minute. I'll keep the clock running.";
         if(duration>2160)return "That shift is over 36 hours. I didn't change anything.";
         if(breakMinutes<0||breakMinutes>=duration)return "Your break can't be as long as the shift.";
+        if(QuarterHour.paidMinutes(start,stop,breakMinutes)<=0)return "After quarter-hour rounding, this shift has no paid time. Nothing changed.";
         add(c,start,stop,breakMinutes,"Voice clock out");
         preferences(c).edit().remove(ACTIVE).commit();
-        return saved(c,"Clocked out. Saved "+formatHours((int)duration-breakMinutes)+" hours"+(breakMinutes>0?", minus "+breakMinutes+" minutes of break":"")+".");
+        return saved(c,"Clocked out. Saved "+formatHours(QuarterHour.paidMinutes(start,stop,breakMinutes))+" hours"+(breakMinutes>0?", minus "+breakMinutes+" minutes of break":"")+".");
     }
     public static synchronized String addRange(Context c,int a,int b,int breakMinutes,boolean yesterday){
         LocalDate day=LocalDate.now().minusDays(yesterday?1:0);
@@ -75,8 +76,9 @@ public final class TimeStore {
         if(stop>System.currentTimeMillis()+60000L)return "That shift ends in the future. I didn't save it.";
         long mins=Math.round((stop-start)/60000.0);
         if(mins<1||mins>2160||breakMinutes>=mins)return "Those hours or break don't look right.";
+        if(QuarterHour.paidMinutes(start,stop,breakMinutes)<=0)return "After quarter-hour rounding, this shift has no paid time. Nothing changed.";
         add(c,start,stop,breakMinutes,"Voice shift entry");
-        return saved(c,"Saved "+formatHours((int)mins-breakMinutes)+" hours for "+(yesterday?"yesterday":"today")+".");
+        return saved(c,"Saved "+formatHours(QuarterHour.paidMinutes(start,stop,breakMinutes))+" hours for "+(yesterday?"yesterday":"today")+".");
     }
     /** Explicit finish command. Does not silently substitute the time the user speaks for the actual finish. */
     public static synchronized String finishAt(Context c,int clockMinute,int breakMinutes,boolean yesterday){
@@ -88,9 +90,10 @@ public final class TimeStore {
         long mins=Math.round((end-start)/60000.0);
         if(end>System.currentTimeMillis()+60000L)return "That finish time is in the future. Nothing saved.";
         if(mins<1||mins>2160||breakMinutes<0||breakMinutes>=mins)return "That finish time or break doesn't look right. Nothing saved.";
+        if(QuarterHour.paidMinutes(start,end,breakMinutes)<=0)return "After quarter-hour rounding, this shift has no paid time. Nothing changed.";
         add(c,start,end,breakMinutes,"Voice finish time");
         preferences(c).edit().remove(ACTIVE).commit();
-        return saved(c,"Saved a shift from "+hm(start)+" to "+hm(end)+", "+formatHours((int)mins-breakMinutes)+" paid hours. Please confirm your hours.");
+        return saved(c,"Saved a shift from "+hm(QuarterHour.nearest(start))+" to "+hm(QuarterHour.nearest(end))+", "+formatHours(QuarterHour.paidMinutes(start,end,breakMinutes))+" paid hours. Please confirm your hours.");
     }
     public static synchronized String replaceRange(Context c,int a,int b,int breaks,boolean yesterday){
         LocalDate day=LocalDate.now().minusDays(yesterday?1:0);
@@ -100,6 +103,7 @@ public final class TimeStore {
         long minutes=Math.round((end-start)/60000.0);
         if(end>System.currentTimeMillis()+60000L||minutes<1||minutes>2160||breaks<0||breaks>=minutes)
             return "Those hours don't look right. Nothing was changed.";
+        if(QuarterHour.paidMinutes(start,end,breaks)<=0)return "Rounded shift has no paid time. Nothing changed.";
         JSONArray old=array(c);JSONArray updated=new JSONArray();int matches=0;
         for(int i=0;i<old.length();i++)try{
             JSONObject o=old.getJSONObject(i);
@@ -110,20 +114,24 @@ public final class TimeStore {
         for(int i=0;i<old.length();i++)try{
             JSONObject o=old.getJSONObject(i);
             if(day.toString().equals(o.optString("date"))){
-                o.put("start",start);o.put("end",end);o.put("breakMinutes",breaks);
-                o.put("minutes",(int)minutes-breaks);o.put("note","Voice corrected shift");
+                o.put("originalStart",start);o.put("originalEnd",end);o.put("originalBreakMinutes",breaks);
+                o.put("start",QuarterHour.nearest(start));o.put("end",QuarterHour.nearest(end));
+                o.put("breakMinutes",QuarterHour.nearestBreak(breaks));o.put("minutes",QuarterHour.paidMinutes(start,end,breaks));o.put("note","Voice corrected shift");
             }
             updated.put(o);
         }catch(Exception ignored){}
         if(!preferences(c).edit().putString(ENTRIES,updated.toString()).commit())return "Couldn't save the correction. Nothing changed.";
-        return saved(c,"Corrected your shift to "+hm(start)+" through "+hm(end)+", "+formatHours((int)minutes-breaks)+" hours. Please confirm.");
+        return saved(c,"Corrected your shift to "+hm(QuarterHour.nearest(start))+" through "+hm(QuarterHour.nearest(end))+", "+formatHours(QuarterHour.paidMinutes(start,end,breaks))+" hours. Please confirm.");
     }
     private static void add(Context c,long start,long stop,int breakMinutes,String note){
         try{
             JSONArray a=array(c);
             JSONObject e=new JSONObject();
-            e.put("id",UUID.randomUUID().toString());e.put("start",start);e.put("end",stop);
-            e.put("breakMinutes",breakMinutes);e.put("minutes",(int)Math.round((stop-start)/60000.0)-breakMinutes);
+            e.put("id",UUID.randomUUID().toString());
+            e.put("originalStart",start);e.put("originalEnd",stop);e.put("originalBreakMinutes",breakMinutes);
+            e.put("start",QuarterHour.nearest(start));e.put("end",QuarterHour.nearest(stop));
+            e.put("breakMinutes",QuarterHour.nearestBreak(breakMinutes));
+            e.put("minutes",QuarterHour.paidMinutes(start,stop,breakMinutes));
             e.put("date",date(start));e.put("note",note);e.put("hourlyRateCents",PayTracker.rateCents(c));
             a.put(e);
             if(!preferences(c).edit().putString(ENTRIES,a.toString()).commit())throw new RuntimeException("Unable to save shift");
@@ -203,19 +211,21 @@ public final class TimeStore {
         try{edit=ShiftInput.parse(dayText,startText,endText,breakText);}
         catch(IllegalArgumentException ex){return "NOT SAVED: "+ex.getMessage();}
         if(edit.end>System.currentTimeMillis()+60000L)return "NOT SAVED: Finish time is in the future.";
+        if(QuarterHour.paidMinutes(edit.start,edit.end,edit.breaks)<=0)return "NOT SAVED: Rounded shift has no paid time.";
         JSONArray old=array(c);boolean found=false;
         for(int i=0;i<old.length();i++)try{
             JSONObject o=old.getJSONObject(i);
             if(id.equals(o.optString("id"))){
-                o.put("start",edit.start);o.put("end",edit.end);
-                o.put("date",edit.day.toString());o.put("breakMinutes",edit.breaks);
-                o.put("minutes",edit.paidMinutes);o.put("note","Manually corrected shift");
+                o.put("originalStart",edit.start);o.put("originalEnd",edit.end);o.put("originalBreakMinutes",edit.breaks);
+                o.put("start",QuarterHour.nearest(edit.start));o.put("end",QuarterHour.nearest(edit.end));
+                o.put("date",edit.day.toString());o.put("breakMinutes",QuarterHour.nearestBreak(edit.breaks));
+                o.put("minutes",QuarterHour.paidMinutes(edit.start,edit.end,edit.breaks));o.put("note","Manually corrected shift");
                 found=true;break;
             }
         }catch(Exception ex){return "NOT SAVED: Unable to edit this record.";}
         if(!found)return "NOT SAVED: That shift wasn't found. Refresh and try again.";
         if(!preferences(c).edit().putString(ENTRIES,old.toString()).commit())return "NOT SAVED: Storage write failed.";
-        return saved(c,"Edited "+edit.day+": "+hm(edit.start)+" to "+hm(edit.end)+", "+formatHours(edit.paidMinutes)+" paid hours.");
+        return saved(c,"Edited "+edit.day+": "+hm(QuarterHour.nearest(edit.start))+" to "+hm(QuarterHour.nearest(edit.end))+", "+formatHours(QuarterHour.paidMinutes(edit.start,edit.end,edit.breaks))+" paid hours.");
     }
     /** Adjust a still-open shift without discarding the existing completed entries. */
     public static synchronized String editActiveStart(Context c,String dayText,String timeText){
