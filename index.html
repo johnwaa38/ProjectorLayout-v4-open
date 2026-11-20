@@ -1,0 +1,158 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Supplier Desk v0.3.1 | Offline Price Change Monitor</title>
+<style>:root{font-family:Segoe UI,Arial,sans-serif;color:#e8eff9;background:#0c1526}*{box-sizing:border-box}body{margin:0}header{padding:26px max(20px,calc((100vw - 1200px)/2));background:#13263f;border-bottom:1px solid #30435b}h1{margin:7px 0 0}header p,.hint{color:#b5c9e0}small{letter-spacing:.17em;color:#91d9e6;font-weight:700}main{max-width:1200px;margin:auto;padding:20px}.panel{background:#15263e;border:1px solid #304967;border-radius:12px;padding:20px;margin-bottom:15px}.pair,.maps{display:grid;grid-template-columns:1fr 1fr;gap:15px}.well{background:#0d1d33;border:1px solid #3b5779;border-radius:9px;padding:15px}label{font-weight:700;display:block;margin:10px 0 7px}input,select{background:#0b1a2e;border:1px solid #506a87;border-radius:7px;color:#f3f8ff;padding:10px;max-width:100%}input[type=file]{width:100%}input[type=text],input[type=search],select{width:100%}button{background:#2083ae;color:#fff;border:0;border-radius:8px;padding:12px 17px;font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button.alt{background:#314f6e}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:15px}.row label{margin:0}.status{margin-top:15px;border-radius:8px;padding:12px;background:#103448;color:#bfe8ef}.error{background:#4f2732;color:#ffd2d2}.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.card{background:#0a1d33;border:1px solid #35516f;padding:13px;border-radius:8px}.card span{display:block;color:#abc4df;font-size:12px}.card strong{font-size:22px}.tablewrap{max-height:530px;overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap}th,td{padding:9px 12px;border-bottom:1px solid #30455f;text-align:left}th{background:#243d5b;position:sticky;top:0}tr:nth-child(even){background:#1c334d}.INCREASE{color:#ffaaa7}.DECREASE{color:#96e8cd}.ADDED,.REMOVED{color:#f4d38d}.hint{font-size:13px;line-height:1.6}[hidden]{display:none!important}.hidden{display:none!important}#printreport{display:none}@media(max-width:820px){.pair,.maps{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}@media print{body{background:#fff;color:#142438;font:11pt Arial}header,main,#results,.panel{display:none!important}#printreport{display:block!important;margin:0 10mm}#printreport h1{color:#173753;font-size:22pt}#printreport table{white-space:normal;font-size:9pt}#printreport th{background:#e9eff7!important;color:#000}#printreport td{border-bottom:1px solid #ccc;color:#111}#printreport .break{page-break-before:always}#printreport .meta{margin:12px 0;color:#444}}</style></head>
+<body><header><small>SUPPLIER DESK / V0.3.1 / OFFLINE</small><h1>Supplier Price-Change Monitor</h1><p>Compare CSV or Excel supplier lists. Map columns. Export a change report. Everything stays on your PC.</p></header><main>
+<section class="panel"><h2>1. Import supplier lists</h2><p class="hint"><strong>QUICK START:</strong> Click <strong>Load demo and show results</strong> for an instant example. Or choose BOTH files; comparison runs automatically. If column names need correction, use the mapping section.</p><div class="pair"><div class="well"><label for="oldFile">Previous price list (.csv or .xlsx)</label><input id="oldFile" type="file" accept=".csv,.xlsx"><label for="oldSheet">Worksheet</label><select id="oldSheet" disabled></select></div><div class="well"><label for="newFile">Updated price list (.csv or .xlsx)</label><input id="newFile" type="file" accept=".csv,.xlsx"><label for="newSheet">Worksheet</label><select id="newSheet" disabled></select></div></div><div class="row"><button id="demo" class="alt">Load demo and show results</button><button id="compare">Compare again</button><button id="download" class="alt" disabled>Export all rows (CSV)</button><button id="print" class="alt" disabled>Print / save PDF</button></div><div class="status" id="message" role="status" aria-live="polite">Click “Load demo and show results” or choose both supplier files. Results appear automatically.</div><p class="hint">Excel support: standard unencrypted XLSX spreadsheets. For formulas, Excel must have saved the calculated values. Legacy XLS, password-protected files and merged headers are unsupported.</p></section>
+<section class="panel" id="mapping" hidden><h2>2. Check column mappings</h2><p class="hint">Review the columns detected automatically. Never map different units or currencies as equivalent without first normalizing them.</p><div class="maps"><div class="well"><h3>Previous list</h3><div id="oldMap"></div><label for="oldVendor">If no supplier column: supplier name</label><input type="text" id="oldVendor" placeholder="e.g. Acme Industrial"></div><div class="well"><h3>Updated list</h3><div id="newMap"></div><label for="newVendor">If no supplier column: supplier name</label><input type="text" id="newVendor" placeholder="e.g. Acme Industrial"></div></div></section>
+<section class="panel" id="results" hidden><h2>3. Price change results</h2><div class="cards" id="cards"></div><p class="hint">Annual impact = (new price − old price) × new annual quantity, matched parts only. Added and removed products have unknown impact. Estimates do not account for currency, units, shipping, discounts, or contracts.</p><div class="row"><label for="filter">Status</label><select id="filter" style="width:auto"><option>ALL</option><option>INCREASE</option><option>DECREASE</option><option>UNCHANGED</option><option>ADDED</option><option>REMOVED</option></select><label for="search">Search</label><input type="search" id="search" placeholder="Supplier or part" style="max-width:260px"><span id="showing" class="hint"></span></div><div class="tablewrap"><table><thead><tr><th>Status</th><th>Supplier</th><th>Part #</th><th>Old price</th><th>New price</th><th>Change</th><th>%</th><th>Annual qty</th><th>Annual impact</th><th>Notes</th></tr></thead><tbody id="tbody"></tbody></table></div></section><p class="hint">Local prototype only. Review your supplier's price basis, currency, UOM, and effective dates before relying on calculations. PDF uses your browser's built-in print-to-PDF feature.</p></main><section id="printreport"></section>
+<script>
+/* Supplier Desk v0.2, exact fixed-point CSV comparison, runs locally. */
+(function(root) {
+  'use strict';
+  const FIELDS=['supplier','part_number','description','unit_price','annual_qty'];
+  const OUT=['status','supplier','part_number','old_description','new_description','old_price','new_price','price_change','price_change_pct','annual_qty','annual_impact','notes'];
+  const STATES=['INCREASE','DECREASE','UNCHANGED','ADDED','REMOVED'];
+  function parseCSV(input) {
+    const s=String(input).replace(/^\uFEFF/,'');
+    const rows=[];let row=[],value='',quoted=false,closed=false;
+    for(let i=0;i<s.length;i++) {
+      const c=s[i];
+      if(quoted) {
+        if(c==='"' && s[i+1]==='"'){value+='"';i++;}
+        else if(c==='"'){quoted=false;closed=true;}
+        else value+=c;
+      } else if(c==='"') {
+        if(value!=='' || closed) throw Error('Malformed CSV: unexpected quote at character '+(i+1));
+        quoted=true;
+      } else if(c===',') {row.push(value);value='';closed=false;}
+      else if(c==='\r'||c==='\n') {
+        if(c==='\r'&&s[i+1]==='\n')i++;
+        row.push(value);rows.push(row);row=[];value='';closed=false;
+      } else {if(closed)throw Error('Malformed CSV: text after closing quote at character '+(i+1));value+=c;}
+    }
+    if(quoted)throw Error('Malformed CSV: unclosed quote');
+    if(row.length || value!=='' || closed){row.push(value);rows.push(row);}
+    while(rows.length && rows[rows.length-1].every(x=>x===''))rows.pop();
+    return rows;
+  }
+  function parseMoney(raw,label) {
+    const s=String(raw).trim();
+    if(!/^(?:\d+)(?:\.\d{1,4})?$/.test(s))throw Error(label+': unit_price must be nonnegative with up to 4 decimal places');
+    let [whole,frac='']=s.split('.');
+    // Bound magnitudes to avoid unwieldy reports and browser hangs.
+    if(whole.length>15)throw Error(label+': unit_price is too large');
+    return BigInt(whole)*10000n+BigInt((frac+'0000').slice(0,4));
+  }
+  function parseQty(raw,label) {
+    const s=String(raw).trim();
+    if(!/^\d+$/.test(s))throw Error(label+': annual_qty must be a nonnegative whole number');
+    if(s.length>12)throw Error(label+': annual_qty is too large');
+    return BigInt(s);
+  }
+  function normalize(s){return String(s).trim().toLocaleLowerCase('en-US');}
+  function readData(csv,label) {
+    const rows=parseCSV(csv);
+    if(!rows.length)throw Error(label+': empty CSV');
+    const headers=rows[0].map(x=>x.trim());
+    const missing=FIELDS.filter(f=>!headers.includes(f));
+    if(missing.length)throw Error(label+': missing columns: '+missing.join(', '));
+    if(new Set(headers).size!==headers.length)throw Error(label+': duplicate column headers');
+    const out=new Map();
+    for(let i=1;i<rows.length;i++) {
+      const r=rows[i];if(r.every(x=>x.trim()===''))continue;
+      const line=i+1;
+      if(r.length!==headers.length)throw Error(label+' line '+line+': expected '+headers.length+' columns; found '+r.length);
+      const get=k=>r[headers.indexOf(k)].trim();
+      const supplier=get('supplier'),part=get('part_number');
+      if(!supplier||!part)throw Error(label+' line '+line+': supplier and part_number required');
+      const key=JSON.stringify([normalize(supplier),normalize(part)]);
+      if(out.has(key))throw Error(label+' line '+line+': duplicate supplier/part_number '+supplier+'/'+part);
+      out.set(key,{supplier,part,desc:get('description'),price:parseMoney(get('unit_price'),label+' line '+line),qty:parseQty(get('annual_qty'),label+' line '+line)});
+    }
+    return out;
+  }
+  function formatScaled(n,places=4){let neg=n<0n;if(neg)n=-n;const base=10n**BigInt(places);return(neg?'-':'')+(n/base).toString()+'.'+(n%base).toString().padStart(places,'0');}
+  function roundDiv(n,d){if(d<=0n)throw Error('Invalid denominator');return n<0n?-((-n+d/2n)/d):(n+d/2n)/d;}
+  function cents(n){return formatScaled(roundDiv(n,100n),2);}
+  function percentage(diff,base){return formatScaled(roundDiv(diff*10000n,base),2);}
+  function compare(old,newer) {
+    let out=[];
+    const keys=[...new Set([...old.keys(),...newer.keys()])].sort();
+    for(const key of keys){
+      const a=old.get(key),b=newer.get(key),src=b||a;
+      const row={status:'',supplier:src.supplier,part_number:src.part,old_description:a?a.desc:'',new_description:b?b.desc:'',old_price:a?formatScaled(a.price):'',new_price:b?formatScaled(b.price):'',price_change:'',price_change_pct:'',annual_qty:String(b?b.qty:a.qty),annual_impact:'',notes:''};
+      if(!a){row.status='ADDED';row.notes='No baseline price; no impact calculated';}
+      else if(!b){row.status='REMOVED';row.notes='No current price; no impact calculated';}
+      else {
+        const diff=b.price-a.price;
+        row.status=diff>0n?'INCREASE':diff<0n?'DECREASE':'UNCHANGED';
+        row.price_change=formatScaled(diff);
+        row.price_change_pct=a.price===0n?'':percentage(diff,a.price);
+        row.annual_impact=cents(diff*b.qty);
+        let notes=[];
+        if(a.qty!==b.qty)notes.push('Annual qty changed: impact uses NEW qty');
+        if(a.desc!==b.desc)notes.push('Description changed');
+        if(a.price===0n)notes.push('Old price zero: percentage undefined');
+        row.notes=notes.join('; ');
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  function summarize(rows) {
+    const counts=Object.fromEntries(STATES.map(s=>[s,rows.filter(r=>r.status===s).length]));
+    const totalCents=rows.reduce((sum,r)=>sum+(r.annual_impact?parseCents(r.annual_impact):0n),0n);
+    return {counts,totalCents,net:cents(totalCents*100n)};
+  }
+  function parseCents(s){let neg=s.startsWith('-');let t=neg?s.slice(1):s;const [a,b]=t.split('.');return (neg?-1n:1n)*(BigInt(a)*100n+BigInt(b));}
+  function quoteCSV(s){s=String(s??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+  function exportCSV(rows){return [OUT.join(','),...rows.map(r=>OUT.map(k=>quoteCSV(r[k])).join(','))].join('\r\n')+'\r\n';}
+  const api={FIELDS,OUT,STATES,parseCSV,readData,compare,summarize,exportCSV,parseMoney,formatScaled};
+  if(typeof module!=='undefined'&&module.exports)module.exports=api;
+  root.SupplierDeskEngine=api;
+})(typeof window!=='undefined'?window:globalThis);
+
+</script>
+<script>
+/* Supplier Desk v0.3: local CSV / XLSX importer. No external dependencies. */
+(function(root){'use strict';
+const ENGINE=root.SupplierDeskEngine || (typeof require!=='undefined'?require('./engine.js'):null);
+const REQUIRED=['supplier','part_number','description','unit_price','annual_qty'];
+const ALIASES={supplier:['supplier','vendor','vendor name','supplier name','manufacturer'],part_number:['part_number','part number','part no','part #','sku','item number','item no','item #','item id','product code','partnumber'],description:['description','item description','product description','product','name','item name'],unit_price:['unit_price','unit price','price','price each','unit cost','cost','cost each','net price'],annual_qty:['annual_qty','annual qty','annual quantity','yearly qty','yearly quantity','annual usage','annual demand','qty per year','estimated annual qty']};
+const clean=s=>String(s??'').trim().toLowerCase().replace(/[_\-]+/g,' ').replace(/\s+/g,' ');
+function suggest(headers){let out={};for(const field of REQUIRED){const matches=headers.map((x,i)=>({x:clean(x),i})).filter(({x})=>ALIASES[field].includes(x));out[field]=matches.length===1?String(matches[0].i):'';}return out;}
+function canonicalCSV(matrix,map,defaultSupplier){if(!matrix.length)throw Error('No records found.');const picks={};for(const field of REQUIRED){const idx=map[field];if(field==='supplier'&&idx==='__default__'){if(!String(defaultSupplier||'').trim())throw Error('Enter a supplier name for records missing that column.');picks[field]=-1;continue;}if(idx===''||idx==null)throw Error('Select a column for '+field);const n=Number(idx);if(!Number.isInteger(n)||n<0||n>=matrix[0].length)throw Error('Invalid mapping for '+field);picks[field]=n;}
+const used=REQUIRED.filter(f=>picks[f]>=0).map(f=>picks[f]);if(new Set(used).size!==used.length)throw Error('A source column cannot serve multiple fields.');
+const out=[REQUIRED];for(let ri=1;ri<matrix.length;ri++){const r=matrix[ri];if(r.every(x=>String(x??'').trim()===''))continue;out.push(REQUIRED.map(f=>picks[f]===-1?defaultSupplier:String(r[picks[f]]??'')));}if(out.length===1)throw Error('No data rows found.');return out.map(r=>r.map(ENGINE.quoteCSV||quoteCSV).join(',')).join('\r\n')+'\r\n';}
+function quoteCSV(s){s=String(s??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function colIndex(cell){const m=/^([A-Z]+)\d+$/i.exec(cell);if(!m)return -1;let n=0;for(const c of m[1].toUpperCase())n=n*26+c.charCodeAt(0)-64;return n-1;}
+function child(el,name){return [...el.children].find(x=>x.localName===name);}
+function children(el,name){return [...el.children].filter(x=>x.localName===name);}
+function xmlDoc(text,name){const doc=new DOMParser().parseFromString(text,'application/xml');if(doc.querySelector('parsererror'))throw Error('Invalid Excel XML: '+name);return doc;}
+function parseSheet(xml,shared){const doc=xmlDoc(xml,'sheet');const data=doc.getElementsByTagNameNS('*','sheetData')[0];if(!data)throw Error('Excel sheet has no data');let records=[],max=0;for(const row of children(data,'row')){const values=[];for(const cell of children(row,'c')){const col=colIndex(cell.getAttribute('r')||'');if(col<0||col>500)throw Error('Unsupported or oversized Excel column');let val='',type=cell.getAttribute('t');if(type==='inlineStr'){const t=cell.getElementsByTagNameNS('*','t');val=[...t].map(x=>x.textContent).join('');}else {const v=child(cell,'v');val=v?v.textContent:'';if(type==='s'){let index=Number(val);if(!Number.isInteger(index)||index<0||index>=shared.length)throw Error('Invalid shared-string index');val=shared[index];}else if(type==='e')throw Error('Excel has a formula error cell at '+cell.getAttribute('r'));else if(child(cell,'f')&&!v)throw Error('Excel formula lacks cached value at '+cell.getAttribute('r')+'. Recalculate and save the file in Excel.');}values[col]=val;}if(values.length>max)max=values.length;records.push({index:Number(row.getAttribute('r'))||records.length+1,values});if(records.length>50000)throw Error('Workbook exceeds 50,000 rows per sheet.');}if(max>501)throw Error('Excel sheet has too many columns');if(!records.length)return [];const first=records.findIndex(x=>x.values.some(v=>String(v??'').trim()!==''));if(first<0)return [];let out=records.slice(first).map(x=>Array.from({length:max},(_,i)=>x.values[i]??''));return out;}
+async function unzipEntries(buffer){const b=new Uint8Array(buffer),dv=new DataView(buffer),names=new Map();let eocd=-1;for(let p=b.length-22;p>=Math.max(0,b.length-65557);p--){if(dv.getUint32(p,true)===0x06054b50){eocd=p;break;}}if(eocd<0)throw Error('Invalid XLSX ZIP directory');const count=dv.getUint16(eocd+10,true),dir=dv.getUint32(eocd+16,true);if(count>2000)throw Error('Too many Excel ZIP entries');let p=dir,total=0;for(let i=0;i<count;i++){if(dv.getUint32(p,true)!==0x02014b50)throw Error('Malformed Excel ZIP directory');const method=dv.getUint16(p+10,true),size=dv.getUint32(p+20,true),expanded=dv.getUint32(p+24,true),n=dv.getUint16(p+28,true),extra=dv.getUint16(p+30,true),comment=dv.getUint16(p+32,true),local=dv.getUint32(p+42,true);const name=new TextDecoder().decode(b.slice(p+46,p+46+n));p+=46+n+extra+comment;if(!/^xl\/(worksheets\/sheet\d+\.xml|sharedStrings\.xml|workbook\.xml|_rels\/workbook\.xml\.rels)$/.test(name))continue;total+=expanded;if(total>40*1024*1024||expanded>20*1024*1024)throw Error('Expanded workbook too large');if(dv.getUint32(local,true)!==0x04034b50)throw Error('Malformed ZIP entry');const start=local+30+dv.getUint16(local+26,true)+dv.getUint16(local+28,true);if(start+size>b.length)throw Error('Truncated ZIP entry');let bytes=b.slice(start,start+size);if(method===8){if(typeof DecompressionStream==='undefined')throw Error('This browser lacks Excel decompression support. Use recent Chrome or Edge.');let stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));const chunks=await new Response(stream).arrayBuffer();bytes=new Uint8Array(chunks);}else if(method!==0)throw Error('Unsupported XLSX compression format');if(bytes.length!==expanded)throw Error('Excel decompression size mismatch');names.set(name,new TextDecoder().decode(bytes));}return names;}
+async function readXlsx(buffer){const entries=await unzipEntries(buffer);const sheets=[...entries.keys()].filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort((a,b)=>Number(a.match(/sheet(\d+)/)[1])-Number(b.match(/sheet(\d+)/)[1]));if(!sheets.length)throw Error('No readable Excel worksheets');let shared=[];if(entries.has('xl/sharedStrings.xml')){const doc=xmlDoc(entries.get('xl/sharedStrings.xml'),'sharedStrings');shared=[...doc.getElementsByTagNameNS('*','si')].map(si=>[...si.getElementsByTagNameNS('*','t')].map(x=>x.textContent).join(''));}const parsed=sheets.map(s=>({name:s.split('/').pop(),rows:parseSheet(entries.get(s),shared)}));return parsed.filter(s=>s.rows.length);}
+async function readFile(file){if(!file)throw Error('Choose a file');let name=file.name.toLowerCase();if(name.endsWith('.csv')){const rows=ENGINE.parseCSV(await file.text());if(!rows.length)throw Error('Empty CSV');return [{name:file.name,rows}];}if(name.endsWith('.xlsx'))return await readXlsx(await file.arrayBuffer());throw Error('Use CSV or XLSX (not legacy XLS).');}
+const api={ALIASES,REQUIRED,suggest,canonicalCSV,readFile,readXlsx,parseSheet};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.SupplierDeskImporter=api;
+})(typeof window!=='undefined'?window:globalThis);
+
+</script>
+<script>
+(function(){'use strict';const $=id=>document.getElementById(id),E=window.SupplierDeskEngine,I=window.SupplierDeskImporter;let current=[],datasets={old:[],new:[]};const fields=[['supplier','Supplier'],['part_number','Part number'],['description','Description'],['unit_price','Unit price'],['annual_qty','Annual qty']];
+const DEMO_OLD=`supplier,part_number,description,unit_price,annual_qty\nAcme Supply,PART-101,Mounting plate,10.00,100\nAcme Supply,PART-102,Fastener box,5.00,200\nAcme Supply,PART-103,Old bracket,15.00,30\n`,DEMO_NEW=`supplier,part_number,description,unit_price,annual_qty\nAcme Supply,PART-101,Mounting plate,12.00,100\nAcme Supply,PART-102,Fastener box,4.50,200\nAcme Supply,PART-104,New bracket,16.00,30\n`;
+function status(str,err=false){$('message').textContent=str;$('message').className='status'+(err?' error':'');}
+function bothReady(){return datasets.old.length>0&&datasets.new.length>0;}
+function selected(side){let i=$(side+'Sheet').selectedIndex;return datasets[side][i]?.rows||[];}
+function setup(side){let sel=$(side+'Sheet');sel.replaceChildren();for(const item of datasets[side]){let o=document.createElement('option');o.textContent=item.name+' ('+Math.max(0,item.rows.length-1)+' rows)';sel.append(o);}sel.disabled=datasets[side].length<2;makeMapping(side);}
+function makeMapping(side){const root=$(side+'Map');root.replaceChildren();let rows=selected(side);if(!rows.length)return;const headers=rows[0],suggested=I.suggest(headers);for(const [key,label] of fields){const div=document.createElement('div');let lab=document.createElement('label');lab.textContent=label;let sel=document.createElement('select');sel.dataset.field=key;let blank=document.createElement('option');blank.value='';blank.textContent='Choose column';sel.append(blank);if(key==='supplier'){let def=document.createElement('option');def.value='__default__';def.textContent='Use supplier name entered below';sel.append(def);}headers.forEach((h,index)=>{let o=document.createElement('option');o.value=String(index);o.textContent=(h||'(unnamed column '+(index+1)+')')+' [column '+(index+1)+']';sel.append(o);});sel.value=suggested[key]||'';div.append(lab,sel);root.append(div);} $('mapping').hidden=false;}
+async function onFile(side){let file=$(side+'File').files[0];if(!file)return;try{status('Reading '+file.name+' ...');datasets[side]=await I.readFile(file);setup(side);$('results').hidden=true;setButtons(false);if(bothReady()){compare();}else{status('Loaded '+file.name+'. Now choose the OTHER supplier file.');}}catch(ex){datasets[side]=[];setup(side);status(ex.message,true);setButtons(false);}}
+function setButtons(ok){$('download').disabled=!ok;$('print').disabled=!ok;}
+function mapped(side){const m={};for(const sel of $(side+'Map').querySelectorAll('select'))m[sel.dataset.field]=sel.value;return I.canonicalCSV(selected(side),m,$(side+'Vendor').value);}
+function render(){const filter=$('filter').value,query=$('search').value.trim().toLowerCase();let rows=current.filter(r=>(filter==='ALL'||r.status===filter)&&(!query||r.supplier.toLowerCase().includes(query)||r.part_number.toLowerCase().includes(query)));let tbody=$('tbody');tbody.replaceChildren();for(const row of rows.slice(0,1000)){let tr=document.createElement('tr');for(const key of ['status','supplier','part_number','old_price','new_price','price_change','price_change_pct','annual_qty','annual_impact','notes']){let td=document.createElement('td');td.textContent=row[key]??'';if(key==='status')td.className=row.status;tr.append(td);}tbody.append(tr);}$('showing').textContent='Showing '+Math.min(rows.length,1000)+' of '+rows.length+' matching records';}
+function makePrint(sum){let root=$('printreport');root.replaceChildren();const h=document.createElement('h1');h.textContent='Supplier Desk | Price Change Audit';let p=document.createElement('p');p.className='meta';p.textContent='Generated '+new Date().toLocaleString()+' • LOCAL DATA • Review before purchasing';let s=document.createElement('p');s.textContent=`Products: ${current.length} | Increases: ${sum.counts.INCREASE} | Decreases: ${sum.counts.DECREASE} | Added: ${sum.counts.ADDED} | Removed: ${sum.counts.REMOVED} | Net estimated annual impact: ${sum.net}`;let note=document.createElement('p');note.textContent='Projected price-only impact at new annual quantities. Excludes unmatched products, terms, units, taxes, freight, discounts and currencies. Verify input data before use.';root.append(h,p,s,note);let t=document.createElement('table'),thead=document.createElement('thead'),tr=document.createElement('tr');for(const x of ['Status','Supplier','Part','Old','New','Δ price','Annual impact']){let th=document.createElement('th');th.textContent=x;tr.append(th);}thead.append(tr);t.append(thead);let tb=document.createElement('tbody');for(const row of current){let line=document.createElement('tr');for(const k of ['status','supplier','part_number','old_price','new_price','price_change','annual_impact']){let td=document.createElement('td');td.textContent=row[k];line.append(td);}tb.append(line);}t.append(tb);root.append(t);}
+function compare(){try{if(!datasets.old.length||!datasets.new.length)throw Error('Select both supplier lists first.');let old=E.readData(mapped('old'),'Previous list'),next=E.readData(mapped('new'),'Updated list');current=E.compare(old,next);let sum=E.summarize(current);$('cards').replaceChildren();for(const [name,val] of [['Increases',sum.counts.INCREASE],['Decreases',sum.counts.DECREASE],['Unchanged',sum.counts.UNCHANGED],['Added',sum.counts.ADDED],['Removed',sum.counts.REMOVED],['Net annual impact',sum.net]]){let card=document.createElement('div');card.className='card';let cap=document.createElement('span');cap.textContent=name;let num=document.createElement('strong');num.textContent=name==='Net annual impact'?'$'+val:val;card.append(cap,num);$('cards').append(card);}$('filter').value='ALL';$('search').value='';$('results').hidden=false;setButtons(true);render();makePrint(sum);status('Comparison complete: '+current.length+' product records. Verify units and currency before purchasing.');}catch(ex){current=[];setButtons(false);$('results').hidden=true;status(ex.message,true);}}
+function download(){const blob=new Blob(['\uFEFF'+E.exportCSV(current)],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Supplier_Desk_Comparison.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);}
+for(const side of ['old','new']){$(side+'File').addEventListener('change',()=>onFile(side));$(side+'Sheet').addEventListener('change',()=>{makeMapping(side);setButtons(false);$('results').hidden=true;});}
+$('demo').addEventListener('click',()=>{datasets.old=[{name:'Demo previous',rows:E.parseCSV(DEMO_OLD)}];datasets.new=[{name:'Demo updated',rows:E.parseCSV(DEMO_NEW)}];setup('old');setup('new');compare();status('Demo comparison complete. Results below. Upload your own two lists to compare real data.');});$('compare').addEventListener('click',compare);$('download').addEventListener('click',download);$('print').addEventListener('click',()=>window.print());$('filter').addEventListener('change',render);$('search').addEventListener('input',render);for(const side of ['old','new']){$(side+'Map').addEventListener('change',()=>{if(bothReady())compare();});$(side+'Vendor').addEventListener('change',()=>{if(bothReady())compare();});}
+})();
+
+</script></body></html>
